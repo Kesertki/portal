@@ -74,7 +74,11 @@ docker-compose up --build
 
 ## API
 
-### GET /api/date.now
+### Date and Time
+
+- [GET /api/date.now](#get-apidatenow)
+
+#### GET /api/date.now
 
 Returns the current date and time in RFC3339 format
 
@@ -90,7 +94,11 @@ curl -X GET "http://localhost:1323/api/date.now"
 }
 ```
 
-### GET /api/geolocation
+### Geolocation API
+
+- [GET /api/geolocation](#get-apigeolocation)
+
+#### GET /api/geolocation
 
 Returns geolocation information for the client's IP address,
 or for the IP address specified in the `X-Forwarded-For` header,
@@ -141,7 +149,11 @@ curl -H "X-Forwarded-For: 8.8.8.8" http://localhost:1323/api/geolocation
 }
 ```
 
-### GET /api/search.instant?q={query}
+### DuckDuckGo Instant Answers API
+
+- [GET /api/search.instant?q={query}](#get-apisearchinstantqquery)
+
+#### GET /api/search.instant?q={query}
 
 Returns an instant answer for the given search query.
 
@@ -153,7 +165,18 @@ Examples:
 - `/api/search.instant?q=global+warming`
 - `/api/search.instant?q=hello%20world`
 
-### GET /api/reminders
+### Reminders API
+
+Provides a simple API for creating and managing reminders.
+Reminders can be scheduled for a specific date and time.
+
+You can also specify a webhook URL to send reminders to external services.
+WebSockets are used to notify clients about new reminders.
+
+- [GET /api/reminders](#get-apireminders)
+- [POST /api/reminders](#post-apireminders)
+
+#### GET /api/reminders
 
 Returns a list of reminders.
 
@@ -182,7 +205,7 @@ curl -X GET "http://localhost:1323/api/reminders"
 ]
 ```
 
-### POST /api/reminders
+#### POST /api/reminders
 
 Creates a new reminder.
 
@@ -208,7 +231,7 @@ curl -X POST "http://localhost:1323/api/reminders" \
 The Reminders Agent has a built-in scheduler with precision up to the minute.
 It uses the `due_date` field to schedule the reminder.
 
-## Webhooks
+#### Webhooks
 
 The reminders API supports webhooks for sending reminders to external services.
 
@@ -225,6 +248,12 @@ curl -X POST http://localhost:1323/api/reminders \
 ## WebSockets
 
 The server supports WebSockets for real-time communication with clients.
+
+- [GET /ws](#get-ws)
+
+Channels:
+
+- `api.reminders`: Receive reminders in real-time
 
 ### /ws
 
