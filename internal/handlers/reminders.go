@@ -111,7 +111,7 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 			continue
 		}
 
-		rows, err := tx.Query("SELECT id, message FROM reminders WHERE due_time BETWEEN ? AND ? AND completed = FALSE",
+		rows, err := tx.Query("SELECT id, message, webhook_url FROM reminders WHERE due_time BETWEEN ? AND ? AND completed = FALSE",
 			truncatedNow.Format("2006-01-02 15:04:05"),
 			truncatedNow.Add(time.Minute).Format("2006-01-02 15:04:05"))
 		if err != nil {
@@ -122,7 +122,7 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 
 		for rows.Next() {
 			var r Reminder
-			if err := rows.Scan(&r.ID, &r.Message); err != nil {
+			if err := rows.Scan(&r.ID, &r.Message, &r.WebhookURL); err != nil {
 				log.Println("Error scanning reminder:", err)
 				tx.Rollback()
 				continue
@@ -134,6 +134,7 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 
 			// Send webhook
 			if r.WebhookURL != "" {
+				log.Printf("Sending webhook for reminder %d to %s\n", r.ID, r.WebhookURL)
 				if err := notifyWebhook(r, r.WebhookURL); err != nil {
 					log.Println("Error sending webhook:", err)
 				}
