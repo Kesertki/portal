@@ -2,11 +2,19 @@
 
 Tiny API and Agent server enabling AI models to access various local services in the real world.
 
+<div align="center">
+  <img src="docs/be0c85ba-e22b-442f-827c-ac2b9a430b49.jpg" alt="Project picture" style="width: 50%; border-radius: 15px;" />
+</div>
+
 > [!WARNING]  
 > The project is in the early stages of development and is not ready for production use.
 
 ## Features
 
+- [x] Docker support
+- [x] Webhooks
+- [x] WebSockets
+- [ ] Plugins API
 - [x] Date and time API
 - [x] Geolocation API
 - [x] DuckDuckGo Instant Answers API
@@ -14,9 +22,6 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
-- [x] Webhooks
-- [x] WebSockets
-- [ ] Plugins API
 
 ## Running from Source
 
