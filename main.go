@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +14,15 @@ import (
 	"github.com/Kesertki/portal/internal/storage"
 )
 
+var (
+	Version   = "dev" // Default value
+	BuildDate = "unknown"
+	GitCommit = "unknown"
+)
+
 func main() {
+	fmt.Printf("%s v%s (Commit: %s, Built: %s)\n", "[portal]", Version, GitCommit, BuildDate)
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file")

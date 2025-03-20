@@ -293,6 +293,18 @@ ws.onclose = () => {
 
 ## Development
 
+### Building the Project
+
+To build the project:
+
+```shell
+go build -ldflags "-X main.Version=1.0.0 -X main.BuildDate=$(date -u +%Y-%m-%d) -X main.GitCommit=$(git rev-parse --short HEAD)" -o portal
+```
+
+Where Version, BuildDate, and GitCommit are set as build-time variables.
+
+### Database Migrations
+
 Creating new migrations:
 
 ```shell
