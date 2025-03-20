@@ -64,8 +64,8 @@ func main() {
 	*/
 	// e.POST("/users", handlers.CreateUser)
 
-	e.POST("/api/reminders", handlers.CreateReminder)
-	e.GET("/api/reminders", handlers.GetReminders)
+	e.GET("/api/reminders.list", handlers.GetReminders)
+	e.POST("/api/reminders.add", handlers.CreateReminder)
 
 	// Create a new WebSocket handler
 	wsHandler := handlers.NewWebSocketHandler()

@@ -187,17 +187,17 @@ Reminders can be scheduled for a specific date and time.
 You can also specify a webhook URL to send reminders to external services.
 WebSockets are used to notify clients about new reminders.
 
-- [GET /api/reminders](#get-apireminders)
-- [POST /api/reminders](#post-apireminders)
+- [GET /api/reminders.list](#get-apireminderslist)
+- [POST /api/reminders.add](#post-apiremindersadd)
 
-#### GET /api/reminders
+#### GET /api/reminders.list
 
 Returns a list of reminders.
 
 Example:
 
 ```shell
-curl -X GET "http://localhost:1323/api/reminders"
+curl -X GET "http://localhost:1323/api/reminders.list"
 ```
 
 ```json
@@ -219,14 +219,14 @@ curl -X GET "http://localhost:1323/api/reminders"
 ]
 ```
 
-#### POST /api/reminders
+#### POST /api/reminders.add
 
 Creates a new reminder.
 
 Example:
 
 ```shell
-curl -X POST "http://localhost:1323/api/reminders" \
+curl -X POST "http://localhost:1323/api/reminders.add" \
 	-H "Content-Type: application/json" \
 	-d "{\"message\":\"Buy milk\",\"description\":\"Buy 2% milk\",\"due_date\":\"2025-03-18T21:08:28-04:00\",\"completed\":false}"
 ```
@@ -254,7 +254,7 @@ When creating a new reminder, you can specify a `webhook_url` field with the URL
 Example of creating a new reminder with a webhook, running 2 minutes from now:
 
 ```shell
-curl -X POST http://localhost:1323/api/reminders \
+curl -X POST http://localhost:1323/api/reminders.add \
 -H "Content-Type: application/json" \
 -d '{"message":"Test reminder","description":"This is a test reminder","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'","completed":false,"webhook_url":"http://your-webhook-receiver/webhook"}'
 ```
