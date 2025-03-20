@@ -44,6 +44,20 @@ Environment variables:
 - `PORTAL_GEO_LOCATION_ENABLED`: Boolean, toggle the geolocation feature (default: false)
 - `PORTAL_CLIENT_IP`: The static IP address to use for geo location
 
+## Building from Source
+
+To build the server binary:
+
+```shell
+go build -o portal .
+```
+
+To run the server binary:
+
+```shell
+./portal
+```
+
 ## Docker
 
 To build and run the Docker container:
