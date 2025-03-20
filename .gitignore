@@ -1,0 +1,39 @@
+# Binaries
+/myapp
+*.exe
+*.out
+*.o
+*.a
+*.so
+
+# Dependencies
+/vendor/
+go.sum
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Test coverage and debug files
+*.cover
+*.cov
+*.prof
+*.test
+
+# Optional workspace files
+/go.work
+/go.work.sum
+
+.env
+.env.*
+data

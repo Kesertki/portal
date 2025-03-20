@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        .channel {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+        .channel-header {
+            font-weight: bold;
+        }
+        .message {
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="messages"></div>
+    <script>
+        const socket = new WebSocket('ws://localhost:1323/ws');
+
+        socket.onmessage = function(event) {
+            const messageData = JSON.parse(event.data);
+            const messagesDiv = document.getElementById('messages');
+
+            // Find or create a div for the channel
+            let channelDiv = document.querySelector(`.channel[data-channel="${messageData.channel}"]`);
+            if (!channelDiv) {
+                channelDiv = document.createElement('div');
+                channelDiv.classList.add('channel');
+                channelDiv.setAttribute('data-channel', messageData.channel);
+
+                const channelHeader = document.createElement('div');
+                channelHeader.classList.add('channel-header');
+                channelHeader.textContent = `Channel: ${messageData.channel}`;
+                channelDiv.appendChild(channelHeader);
+
+                messagesDiv.appendChild(channelDiv);
+            }
+
+            // Create a message element
+            const message = document.createElement('div');
+            message.classList.add('message');
+            message.textContent = `Received message: ${messageData.content}`;
+            channelDiv.appendChild(message);
+        };
+
+        socket.onopen = function(event) {
+            console.log("WebSocket is open now.");
+            // Send a ping every 30 seconds to keep the connection alive
+            setInterval(function() {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({type: "ping"}));
+                }
+            }, 30000);
+        };
+
+        socket.onclose = function(event) {
+            console.log("WebSocket is closed now.");
+        };
+
+        socket.onerror = function(error) {
+            console.log("WebSocket error: ", error);
+        };
+    </script>
+</body>
+</html>

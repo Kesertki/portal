@@ -1,0 +1,32 @@
+# Binaries and build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.log
+*.test
+*.out
+
+# Build directories
+bin/
+dist/
+
+# Version control
+.git
+.gitignore
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.iml
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+## Project-specific files
+.cache
+.env
+.env.*
