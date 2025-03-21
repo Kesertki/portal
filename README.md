@@ -89,11 +89,15 @@ docker-compose up --build
 
 ## API
 
+The server provides a simple REST API for accessing various services.
+
+All API endpoints are prefixed with `/api`.
+
 ### Date and Time
 
-- [GET /api/date.now](#get-apidatenow)
+- [GET /date.now](#get-datenow)
 
-#### GET /api/date.now
+#### GET /date.now
 
 Returns the current date and time in RFC3339 format
 
@@ -111,9 +115,9 @@ curl -X GET "http://localhost:1323/api/date.now"
 
 ### Geolocation API
 
-- [GET /api/geolocation](#get-apigeolocation)
+- [GET /geolocation](#get-geolocation)
 
-#### GET /api/geolocation
+#### GET /geolocation
 
 Returns geolocation information for the client's IP address,
 or for the IP address specified in the `X-Forwarded-For` header,
@@ -166,9 +170,9 @@ curl -H "X-Forwarded-For: 8.8.8.8" http://localhost:1323/api/geolocation
 
 ### DuckDuckGo Instant Answers API
 
-- [GET /api/search.instant?q={query}](#get-apisearchinstantqquery)
+- [GET /search.instant?q={query}](#get-searchinstantqquery)
 
-#### GET /api/search.instant?q={query}
+#### GET /search.instant?q={query}
 
 Returns an instant answer for the given search query.
 
@@ -177,8 +181,8 @@ Uses the DuckDuckGo Instant Answer API:
 
 Examples:
 
-- `/api/search.instant?q=global+warming`
-- `/api/search.instant?q=hello%20world`
+- `/search.instant?q=global+warming`
+- `/search.instant?q=hello%20world`
 
 ### Reminders API
 
@@ -188,13 +192,13 @@ Reminders can be scheduled for a specific date and time.
 You can also specify a webhook URL to send reminders to external services.
 WebSockets are used to notify clients about new reminders.
 
-- [GET /api/reminders.list](#get-apireminderslist)
-- [POST /api/reminders.add](#post-apiremindersadd)
-- [POST /api/reminders.complete](#post-apireminderscomplete)
-- [POST /api/reminders.delete](#post-apiremindersdelete)
-- [GET /api/reminders.info](#get-apiremindersinfo)
+- [GET /reminders.list](#get-reminderslist)
+- [POST /reminders.add](#post-remindersadd)
+- [POST /reminders.complete](#post-reminderscomplete)
+- [POST /reminders.delete](#post-remindersdelete)
+- [GET /reminders.info](#get-remindersinfo)
 
-#### GET /api/reminders.list
+#### GET /reminders.list
 
 Returns a list of reminders.
 
@@ -223,7 +227,7 @@ curl -X GET "http://localhost:1323/api/reminders.list"
 ]
 ```
 
-#### POST /api/reminders.add
+#### POST /reminders.add
 
 Creates a new reminder.
 
@@ -259,7 +263,7 @@ The returned reminder object:
 The Reminders Agent has a built-in scheduler with precision up to the minute.
 It uses the `due_date` field to schedule the reminder.
 
-#### POST /api/reminders.complete
+#### POST /reminders.complete
 
 Marks a reminder as completed.
 
@@ -273,7 +277,7 @@ Example:
 curl -X POST "http://localhost:1323/api/reminders.complete?id=123"
 ```
 
-#### POST /api/reminders.delete
+#### POST /reminders.delete
 
 Deletes a reminder.
 
@@ -287,7 +291,7 @@ Example:
 curl -X POST "http://localhost:1323/api/reminders.delete?id=123"
 ```
 
-#### GET /api/reminders.info
+#### GET /reminders.info
 
 Returns information about a specific reminder.
 
@@ -327,11 +331,13 @@ curl -X POST http://localhost:1323/api/reminders.add \
 
 ### Chats API
 
-- [POST /api/chats.add](#post-apichatsadd)
-- [GET /api/chats.list](#get-apichatslist)
-- [POST /api/chats.delete](#post-apichatsdelete)
+- [POST /chats.add](#post-chatsadd)
+- [GET /chats.list](#get-chatslist)
+- [POST /chats.delete](#post-chatsdelete)
+- [POST /messages.add](#post-messagesadd)
+- [GET /messages.list](#get-messageslist)
 
-#### POST /api/chats.add
+#### POST /chats.add
 
 Creates a new chat.
 
@@ -364,7 +370,7 @@ The returned chat object:
 }
 ```
 
-#### GET /api/chats.list
+#### GET /chats.list
 
 Returns a list of chats.
 
@@ -389,7 +395,7 @@ curl -X GET "http://localhost:1323/api/chats.list?user_id=some-user-id"
 ]
 ```
 
-#### POST /api/chats.delete
+#### POST /chats.delete
 
 Deletes a chat.
 
@@ -403,7 +409,7 @@ Example:
 curl -X POST "http://localhost:1323/api/chats.delete?id=123"
 ```
 
-#### POST /api/chats.addMessage
+#### POST /messages.add
 
 Adds a new message to a chat.
 
@@ -419,7 +425,7 @@ Request body:
 Example:
 
 ```shell
-curl -X POST "http://localhost:1323/api/chats.addMessage" \
+curl -X POST "http://localhost:1323/api/messages.add" \
   -H "Content-Type: application/json" \
   -d '{
     "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
@@ -443,6 +449,35 @@ The returned message object:
   "feedback": 0,
   "tools": null
 }
+```
+
+#### GET /messages.list
+
+Returns a list of messages in a chat.
+
+Parameters:
+
+- `chat_id`: The chat ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/messages.list?chat_id=d6924d7f-e53d-452e-83a0-0f0893de68b5"
+```
+
+```json
+[
+  {
+    "id": "c4de2af4-ea23-45a1-b039-cadace10491f",
+    "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+    "sender": "user:some-user",
+    "sender_role": "user",
+    "content": "Hello, world!",
+    "timestamp": 1742551200,
+    "feedback": 0,
+    "tools": null
+  }
+]
 ```
 
 ## WebSockets

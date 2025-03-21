@@ -25,7 +25,7 @@ type ChatMessage struct {
 	Content    string          `json:"content"`
 	Timestamp  int             `json:"timestamp"`
 	Feedback   int             `json:"feedback"`
-	Tools      json.RawMessage `json:"tools"`
+	Tools      json.RawMessage `json:"tools,omitempty"`
 }
 
 func CreateChat(c echo.Context) error {
@@ -121,4 +121,36 @@ func CreateChatMessage(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, chatMessage)
+}
+
+func GetChatMessages(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	chatID := c.QueryParam("chat_id")
+	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, feedback, tools FROM messages WHERE chat_id = ? ORDER BY timestamp DESC", chatID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer rows.Close()
+
+	messages := []ChatMessage{}
+	for rows.Next() {
+		var message ChatMessage
+		var tools []byte // Use a byte slice to scan the JSON string
+		if err := rows.Scan(&message.ID, &message.ChatID, &message.Sender, &message.SenderRole, &message.Content, &message.Timestamp, &message.Feedback, &tools); err != nil {
+			log.Println(err)
+			return err
+		}
+		if tools != nil {
+			message.Tools = json.RawMessage(tools) // Convert the byte slice to json.RawMessage
+		}
+		messages = append(messages, message)
+	}
+
+	return c.JSON(http.StatusOK, messages)
 }

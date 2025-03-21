@@ -65,7 +65,8 @@ func main() {
 	e.POST("/api/chats.add", handlers.CreateChat)
 	e.POST("/api/chats.delete", handlers.DeleteChat)
 	e.GET("/api/chats.list", handlers.GetChats)
-	e.POST("/api/chats.addMessage", handlers.CreateChatMessage)
+	e.POST("/api/messages.add", handlers.CreateChatMessage)
+	e.GET("/api/messages.list", handlers.GetChatMessages)
 
 	// Create a new WebSocket handler
 	wsHandler := handlers.NewWebSocketHandler()
