@@ -356,8 +356,7 @@ curl -X POST "http://localhost:1323/api/chats.add" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "some-user-id",
-    "title": "My Chat",
-    "timestamp": 1742551200
+    "title": "My Chat"
   }'
 ````
 
