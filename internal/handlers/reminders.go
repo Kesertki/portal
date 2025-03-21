@@ -70,6 +70,22 @@ func GetReminders(c echo.Context) error {
 	return c.JSON(http.StatusOK, reminders)
 }
 
+func CompleteReminder(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	id := c.QueryParam("id")
+	_, err = db.Exec("UPDATE reminders SET completed = TRUE WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
 // Call this function in your agent loop when a reminder is due:
 // notifyWebhook(reminder, "https://receiver-server.com/webhook")
 func notifyWebhook(reminder Reminder, webhookURL string) error {

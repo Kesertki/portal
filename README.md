@@ -12,16 +12,16 @@ Tiny API and Agent server enabling AI models to access various local services in
 ## Features
 
 - [x] Docker support
-- [x] Webhooks
-- [x] WebSockets
-- [ ] Plugins API
-- [x] Date and time API
-- [x] Geolocation API
-- [x] DuckDuckGo Instant Answers API
-- [x] Reminders API
+- [x] [Webhooks](#webhooks)
+- [x] [WebSockets](#websockets)
+- [x] [Date and time API](#date-and-time)
+- [x] [Geolocation API](#geolocation-api)
+- [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
+- [x] [Reminders API](#reminders-api)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
+- [ ] Plugins API
 
 ## Running from Source
 
@@ -189,6 +189,7 @@ WebSockets are used to notify clients about new reminders.
 
 - [GET /api/reminders.list](#get-apireminderslist)
 - [POST /api/reminders.add](#post-apiremindersadd)
+- [POST /api/reminders.complete](#post-apireminderscomplete)
 
 #### GET /api/reminders.list
 
@@ -246,6 +247,20 @@ The returned reminder object:
 
 The Reminders Agent has a built-in scheduler with precision up to the minute.
 It uses the `due_date` field to schedule the reminder.
+
+#### POST /api/reminders.complete
+
+Marks a reminder as completed.
+
+Parameters:
+
+- `id`: The reminder ID
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/reminders.complete?id=123"
+```
 
 #### Webhooks
 

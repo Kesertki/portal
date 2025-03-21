@@ -56,16 +56,9 @@ func main() {
 
 	e.Static("/", "public")
 
-	// e.GET("/users/:id", handlers.GetUser)
-	/*
-		curl -X POST http://localhost:1323/users \
-		     -H "Content-Type: application/json" \
-		     -d '{"name": "John Doe", "email": "john.doe@example.com"}'
-	*/
-	// e.POST("/users", handlers.CreateUser)
-
 	e.GET("/api/reminders.list", handlers.GetReminders)
 	e.POST("/api/reminders.add", handlers.CreateReminder)
+	e.POST("/api/reminders.complete", handlers.CompleteReminder)
 
 	// Create a new WebSocket handler
 	wsHandler := handlers.NewWebSocketHandler()
