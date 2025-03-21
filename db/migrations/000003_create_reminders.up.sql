@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS reminders (
-    id INTEGER NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
     message TEXT,
     description TEXT,
     due_time DATETIME,

@@ -203,14 +203,14 @@ curl -X GET "http://localhost:1323/api/reminders.list"
 ```json
 [
   {
-	"id": 1,
+	"id": "71f4491c-417e-4fe0-aa06-5722b942e273",
 	"message": "Buy milk",
 	"description": "Buy 2% milk",
 	"due_date": "2025-03-18T21:08:28-04:00",
 	"completed": false
   },
   {
-	"id": 2,
+	"id": "09d27d7f-27ff-4e01-9598-104b3d654675",
 	"title": "Call mom",
 	"description": "Call mom on her birthday",
 	"due_date": "2025-03-18T21:08:28-04:00",
@@ -231,9 +231,11 @@ curl -X POST "http://localhost:1323/api/reminders.add" \
 	-d "{\"message\":\"Buy milk\",\"description\":\"Buy 2% milk\",\"due_date\":\"2025-03-18T21:08:28-04:00\",\"completed\":false}"
 ```
 
+The returned reminder object:
+
 ```json
 {
-  "id": 1,
+  "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
   "message": "Buy milk",
   "description": "Buy 2% milk",
   "due_date": "2025-03-18T21:08:28-04:00",
@@ -263,7 +265,7 @@ curl -X POST http://localhost:1323/api/reminders.add \
 
 The server supports WebSockets for real-time communication with clients.
 
-- [GET /ws](#get-ws)
+- [GET /ws](#ws)
 
 Channels:
 

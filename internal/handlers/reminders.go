@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/Kesertki/portal/internal/storage"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type Reminder struct {
-	ID          int       `json:"id"`
+	ID          string    `json:"id"`
 	Message     string    `json:"message"`
 	Description string    `json:"description"`
 	DueTime     time.Time `json:"due_time"`
@@ -33,16 +34,15 @@ func CreateReminder(c echo.Context) error {
 	if err := c.Bind(reminder); err != nil {
 		return err
 	}
-	res, err := db.Exec("INSERT INTO reminders(message, description, due_time, completed, webhook_url) VALUES(?, ?, ?, ?, ?)",
-		reminder.Message, reminder.Description, reminder.DueTime, reminder.Completed, reminder.WebhookURL)
+
+	reminder.ID = uuid.New().String()
+
+	_, err = db.Exec("INSERT INTO reminders(id, message, description, due_time, completed, webhook_url) VALUES(?, ?, ?, ?, ?, ?)",
+		reminder.ID, reminder.Message, reminder.Description, reminder.DueTime, reminder.Completed, reminder.WebhookURL)
 	if err != nil {
 		return err
 	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return err
-	}
-	reminder.ID = int(id)
+
 	return c.JSON(http.StatusCreated, reminder)
 }
 
@@ -88,7 +88,7 @@ func notifyWebhook(reminder Reminder, webhookURL string) error {
 		return fmt.Errorf("failed to send webhook: %s", resp.Status)
 	}
 
-	log.Printf("Webhook sent for reminder %d\n", reminder.ID)
+	log.Printf("Webhook sent for reminder %s\n", reminder.ID)
 	return nil
 }
 
@@ -127,14 +127,14 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 				tx.Rollback()
 				continue
 			}
-			log.Printf("Reminder %d: %s\n", r.ID, r.Message)
+			log.Printf("Reminder %s: %s\n", r.ID, r.Message)
 
 			// Notify via WebSocket
 			wsHandler.BroadcastMessage("api.reminders", r.Message)
 
 			// Send webhook
 			if r.WebhookURL != "" {
-				log.Printf("Sending webhook for reminder %d to %s\n", r.ID, r.WebhookURL)
+				log.Printf("Sending webhook for reminder %s to %s\n", r.ID, r.WebhookURL)
 				if err := notifyWebhook(r, r.WebhookURL); err != nil {
 					log.Println("Error sending webhook:", err)
 				}
