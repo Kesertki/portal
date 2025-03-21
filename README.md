@@ -18,6 +18,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [Geolocation API](#geolocation-api)
 - [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
 - [x] [Reminders API](#reminders-api)
+- [-] Chat API
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
@@ -322,6 +323,58 @@ Example of creating a new reminder with a webhook, running 2 minutes from now:
 curl -X POST http://localhost:1323/api/reminders.add \
 -H "Content-Type: application/json" \
 -d '{"message":"Test reminder","description":"This is a test reminder","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'","completed":false,"webhook_url":"http://your-webhook-receiver/webhook"}'
+```
+
+### Chat API
+
+- [POST /api/chat.create](#post-apichatcreate)
+- [POST /api/chat.delete](#post-apichatdelete)
+
+#### POST /api/chat.create
+
+Creates a new chat.
+
+Request body:
+
+- `user_id`: The user ID
+- `title`: The chat title
+- `timestamp`: The chat creation timestamp
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chat.create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "some-user-id",
+    "title": "My Chat",
+    "timestamp": 1742551200
+  }'
+````
+
+The returned chat object:
+
+```json
+{
+  "id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+  "user_id": "some-user-id",
+  "title": "My Chat",
+  "timestamp": 1742551200
+}
+```
+
+#### POST /api/chat.delete
+
+Deletes a chat.
+
+Parameters:
+
+- `id`: The chat ID
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chat.delete?id=123"
 ```
 
 ## WebSockets

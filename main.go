@@ -62,6 +62,9 @@ func main() {
 	e.POST("/api/reminders.delete", handlers.DeleteReminder)
 	e.GET("/api/reminders.info", handlers.GetReminderInfo)
 
+	e.POST("/api/chat.create", handlers.CreateChat)
+	e.POST("/api/chat.delete", handlers.DeleteChat)
+
 	// Create a new WebSocket handler
 	wsHandler := handlers.NewWebSocketHandler()
 
