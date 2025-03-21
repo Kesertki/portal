@@ -24,7 +24,6 @@ type ChatMessage struct {
 	SenderRole string          `json:"sender_role"`
 	Content    string          `json:"content"`
 	Timestamp  int             `json:"timestamp"`
-	Feedback   int             `json:"feedback"`
 	Tools      json.RawMessage `json:"tools,omitempty"`
 }
 
@@ -131,7 +130,7 @@ func GetChatMessages(c echo.Context) error {
 	defer db.Close()
 
 	chatID := c.QueryParam("chat_id")
-	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, feedback, tools FROM messages WHERE chat_id = ? ORDER BY timestamp DESC", chatID)
+	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, tools FROM messages WHERE chat_id = ? ORDER BY timestamp DESC", chatID)
 	if err != nil {
 		log.Println(err)
 		return err
@@ -142,7 +141,7 @@ func GetChatMessages(c echo.Context) error {
 	for rows.Next() {
 		var message ChatMessage
 		var tools []byte // Use a byte slice to scan the JSON string
-		if err := rows.Scan(&message.ID, &message.ChatID, &message.Sender, &message.SenderRole, &message.Content, &message.Timestamp, &message.Feedback, &tools); err != nil {
+		if err := rows.Scan(&message.ID, &message.ChatID, &message.Sender, &message.SenderRole, &message.Content, &message.Timestamp, &tools); err != nil {
 			log.Println(err)
 			return err
 		}

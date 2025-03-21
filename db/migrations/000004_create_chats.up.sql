@@ -20,7 +20,6 @@ CREATE TABLE messages (
 	sender_role TEXT NOT NULL, -- 'user' | 'assistant' | 'tool' | 'system'
 	content TEXT NOT NULL,
 	timestamp INTEGER NOT NULL,
-	feedback INTEGER DEFAULT 0, -- 1 - upvote, 2 - downvote
 	tools JSON,
 	FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
 );
