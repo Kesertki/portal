@@ -18,7 +18,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [Geolocation API](#geolocation-api)
 - [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
 - [x] [Reminders API](#reminders-api)
-- [-] Chat API
+- [-] Chats API
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
@@ -325,12 +325,12 @@ curl -X POST http://localhost:1323/api/reminders.add \
 -d '{"message":"Test reminder","description":"This is a test reminder","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'","completed":false,"webhook_url":"http://your-webhook-receiver/webhook"}'
 ```
 
-### Chat API
+### Chats API
 
-- [POST /api/chat.create](#post-apichatcreate)
-- [POST /api/chat.delete](#post-apichatdelete)
+- [POST /api/chats.add](#post-apichatsadd)
+- [POST /api/chats.delete](#post-apichatsdelete)
 
-#### POST /api/chat.create
+#### POST /api/chats.add
 
 Creates a new chat.
 
@@ -343,7 +343,7 @@ Request body:
 Example:
 
 ```shell
-curl -X POST "http://localhost:1323/api/chat.create" \
+curl -X POST "http://localhost:1323/api/chats.add" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "some-user-id",
@@ -363,7 +363,7 @@ The returned chat object:
 }
 ```
 
-#### POST /api/chat.delete
+#### POST /api/chats.delete
 
 Deletes a chat.
 
@@ -374,7 +374,7 @@ Parameters:
 Example:
 
 ```shell
-curl -X POST "http://localhost:1323/api/chat.delete?id=123"
+curl -X POST "http://localhost:1323/api/chats.delete?id=123"
 ```
 
 ## WebSockets
