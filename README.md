@@ -403,6 +403,48 @@ Example:
 curl -X POST "http://localhost:1323/api/chats.delete?id=123"
 ```
 
+#### POST /api/chats.addMessage
+
+Adds a new message to a chat.
+
+Request body:
+
+- `chat_id`: The chat ID
+- `sender`: The sender user or model ID in the format `user:<user-id>` or `model:<model-id>`
+- `sender_role`: The sender role (`user` | `assistant` | `tool` | `system`)
+- `content`: The message content, text or JSON
+- `timestamp`: The message timestamp in Unix time format
+- `tools`: The list of tools used in the message, in JSON format (optional)
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chats.addMessage" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+    "sender": "user:some-user",
+    "sender_role": "user",
+    "content": "Hello, world!",
+    "timestamp": 1742551200
+  }'
+```
+
+The returned message object:
+
+```json
+{
+  "id": "c4de2af4-ea23-45a1-b039-cadace10491f",
+  "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+  "sender": "user:some-user",
+  "sender_role": "user",
+  "content": "Hello, world!",
+  "timestamp": 1742551200,
+  "feedback": 0,
+  "tools": null
+}
+```
+
 ## WebSockets
 
 The server supports WebSockets for real-time communication with clients.

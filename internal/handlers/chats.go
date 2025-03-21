@@ -98,3 +98,27 @@ func GetChats(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, chats)
 }
+
+func CreateChatMessage(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	chatMessage := new(ChatMessage)
+	if err := c.Bind(chatMessage); err != nil {
+		return err
+	}
+
+	chatMessage.ID = uuid.New().String()
+
+	_, err = db.Exec("INSERT INTO messages (id, chat_id, sender, sender_role, content, timestamp, tools) VALUES(?, ?, ?, ?, ?, ?, ?)",
+		chatMessage.ID, chatMessage.ChatID, chatMessage.Sender, chatMessage.SenderRole, chatMessage.Content, chatMessage.Timestamp, chatMessage.Tools)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return c.JSON(http.StatusCreated, chatMessage)
+}
