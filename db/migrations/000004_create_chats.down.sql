@@ -5,4 +5,5 @@ DROP INDEX idx_messages_chat_id;
 DROP INDEX idx_messages_timestamp;
 
 DROP TABLE messages;
+DROP TABLE chats_pins;
 DROP TABLE chats;

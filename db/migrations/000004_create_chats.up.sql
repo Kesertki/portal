@@ -5,12 +5,12 @@ CREATE TABLE IF NOT EXISTS chats (
 	timestamp INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS chats_pinned (
+CREATE TABLE IF NOT EXISTS chats_pins (
 	id INTEGER PRIMARY KEY,
 	chat_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
-	timestamp INTEGER NOT NULL,
 	FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+	UNIQUE(chat_id, user_id)
 );
 
 CREATE TABLE messages (

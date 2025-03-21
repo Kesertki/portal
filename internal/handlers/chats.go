@@ -28,6 +28,11 @@ type ChatMessage struct {
 	Tools      json.RawMessage `json:"tools,omitempty"`
 }
 
+type ChatPin struct {
+	ChatID string `json:"chat_id"`
+	UserID string `json:"user_id"`
+}
+
 func CreateChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
@@ -51,6 +56,51 @@ func CreateChat(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, chat)
+}
+
+func PinChat(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	chatPin := new(ChatPin)
+	if err := c.Bind(chatPin); err != nil {
+		log.Println(err)
+		return err
+	}
+
+	_, err = db.Exec("INSERT INTO chats_pins(chat_id, user_id) VALUES(?, ?) ON CONFLICT(chat_id, user_id) DO NOTHING",
+		chatPin.ChatID, chatPin.UserID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func UnpinChat(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	chatPin := new(ChatPin)
+	if err := c.Bind(chatPin); err != nil {
+		log.Panicln(err)
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM chats_pins WHERE chat_id = ? AND user_id = ?", chatPin.ChatID, chatPin.UserID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
 }
 
 func DeleteChat(c echo.Context) error {

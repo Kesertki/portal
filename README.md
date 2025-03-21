@@ -334,6 +334,8 @@ curl -X POST http://localhost:1323/api/reminders.add \
 - [POST /chats.add](#post-chatsadd)
 - [GET /chats.list](#get-chatslist)
 - [POST /chats.delete](#post-chatsdelete)
+- [POST /chats.pin](#post-chatspin)
+- [POST /chats.unpin](#post-chatsunpin)
 - [POST /messages.add](#post-messagesadd)
 - [GET /messages.list](#get-messageslist)
 
@@ -407,6 +409,46 @@ Example:
 
 ```shell
 curl -X POST "http://localhost:1323/api/chats.delete?id=123"
+```
+
+#### POST /chats.pin
+
+Pins a chat.
+
+Request body:
+
+- `chat_id`: The chat ID
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chats.pin" \
+  -H "Content-Type: application/json" \
+  -d '{
+	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+	"user_id": "some-user-id"
+  }'
+```
+
+#### POST /chats.unpin
+
+Unpins a chat.
+
+Request body:
+
+- `chat_id`: The chat ID
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chats.unpin" \
+  -H "Content-Type: application/json" \
+  -d '{
+	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+	"user_id": "some-user-id"
+  }'
 ```
 
 #### POST /messages.add
