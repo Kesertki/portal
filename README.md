@@ -431,8 +431,7 @@ curl -X POST "http://localhost:1323/api/messages.add" \
     "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
     "sender": "user:some-user",
     "sender_role": "user",
-    "content": "Hello, world!",
-    "timestamp": 1742551200
+    "content": "Hello, world!"
   }'
 ```
 

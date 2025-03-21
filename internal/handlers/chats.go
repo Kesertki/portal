@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Kesertki/portal/internal/storage"
 	"github.com/google/uuid"
@@ -14,7 +15,7 @@ type Chat struct {
 	ID        string `json:"id"`
 	UserID    string `json:"user_id"`
 	Title     string `json:"title"`
-	Timestamp int    `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 type ChatMessage struct {
@@ -23,7 +24,7 @@ type ChatMessage struct {
 	Sender     string          `json:"sender"`
 	SenderRole string          `json:"sender_role"`
 	Content    string          `json:"content"`
-	Timestamp  int             `json:"timestamp"`
+	Timestamp  int64           `json:"timestamp"`
 	Tools      json.RawMessage `json:"tools,omitempty"`
 }
 
@@ -40,6 +41,7 @@ func CreateChat(c echo.Context) error {
 	}
 
 	chat.ID = uuid.New().String()
+	chat.Timestamp = time.Now().Unix()
 
 	_, err = db.Exec("INSERT INTO chats(id, user_id, title, timestamp) VALUES(?, ?, ?, ?)",
 		chat.ID, chat.UserID, chat.Title, chat.Timestamp)
@@ -111,6 +113,7 @@ func CreateChatMessage(c echo.Context) error {
 	}
 
 	chatMessage.ID = uuid.New().String()
+	chatMessage.Timestamp = time.Now().Unix()
 
 	_, err = db.Exec("INSERT INTO messages (id, chat_id, sender, sender_role, content, timestamp, tools) VALUES(?, ?, ?, ?, ?, ?, ?)",
 		chatMessage.ID, chatMessage.ChatID, chatMessage.Sender, chatMessage.SenderRole, chatMessage.Content, chatMessage.Timestamp, chatMessage.Tools)
