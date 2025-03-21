@@ -190,6 +190,8 @@ WebSockets are used to notify clients about new reminders.
 - [GET /api/reminders.list](#get-apireminderslist)
 - [POST /api/reminders.add](#post-apiremindersadd)
 - [POST /api/reminders.complete](#post-apireminderscomplete)
+- [POST /api/reminders.delete](#post-apiremindersdelete)
+- [GET /api/reminders.info](#get-apiremindersinfo)
 
 #### GET /api/reminders.list
 
@@ -223,6 +225,14 @@ curl -X GET "http://localhost:1323/api/reminders.list"
 #### POST /api/reminders.add
 
 Creates a new reminder.
+
+Request body:
+
+- `message`: The reminder message
+- `description`: The reminder description
+- `due_date`: The due date and time in RFC3339 format
+- `completed`: Boolean, whether the reminder is completed
+- `webhook_url`: The URL of the webhook receiver
 
 Example:
 
@@ -260,6 +270,44 @@ Example:
 
 ```shell
 curl -X POST "http://localhost:1323/api/reminders.complete?id=123"
+```
+
+#### POST /api/reminders.delete
+
+Deletes a reminder.
+
+Parameters:
+
+- `id`: The reminder ID
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/reminders.delete?id=123"
+```
+
+#### GET /api/reminders.info
+
+Returns information about a specific reminder.
+
+Parameters:
+
+- `id`: The reminder ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/reminders.info?id=09d27d7f-27ff-4e01-9598-104b3d654675"
+```
+
+```json
+{
+  "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
+  "message": "Buy milk",
+  "description": "Buy 2% milk",
+  "due_date": "2025-03-18T21:08:28-04:00",
+  "completed": false
+}
 ```
 
 #### Webhooks

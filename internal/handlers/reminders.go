@@ -86,6 +86,40 @@ func CompleteReminder(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+func DeleteReminder(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	id := c.QueryParam("id")
+	_, err = db.Exec("DELETE FROM reminders WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func GetReminderInfo(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	id := c.QueryParam("id")
+	row := db.QueryRow("SELECT id, message, description, due_time, completed, webhook_url FROM reminders WHERE id = ?", id)
+
+	var r Reminder
+	if err := row.Scan(&r.ID, &r.Message, &r.Description, &r.DueTime, &r.Completed, &r.WebhookURL); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, r)
+}
+
 // Call this function in your agent loop when a reminder is due:
 // notifyWebhook(reminder, "https://receiver-server.com/webhook")
 func notifyWebhook(reminder Reminder, webhookURL string) error {
