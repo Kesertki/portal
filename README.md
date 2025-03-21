@@ -328,6 +328,7 @@ curl -X POST http://localhost:1323/api/reminders.add \
 ### Chats API
 
 - [POST /api/chats.add](#post-apichatsadd)
+- [GET /api/chats.list](#get-apichatslist)
 - [POST /api/chats.delete](#post-apichatsdelete)
 
 #### POST /api/chats.add
@@ -361,6 +362,31 @@ The returned chat object:
   "title": "My Chat",
   "timestamp": 1742551200
 }
+```
+
+#### GET /api/chats.list
+
+Returns a list of chats.
+
+Parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/chats.list?user_id=some-user-id"
+```
+
+```json
+[
+  {
+    "id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+    "user_id": "some-user-id",
+    "title": "My Chat",
+    "timestamp": 1742551200
+  }
+]
 ```
 
 #### POST /api/chats.delete

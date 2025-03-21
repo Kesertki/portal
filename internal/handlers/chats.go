@@ -69,3 +69,32 @@ func DeleteChat(c echo.Context) error {
 
 	return c.NoContent(http.StatusOK)
 }
+
+func GetChats(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	userID := c.QueryParam("user_id")
+
+	rows, err := db.Query("SELECT id, user_id, title, timestamp FROM chats WHERE user_id = ? ORDER BY timestamp DESC", userID)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	defer rows.Close()
+
+	chats := []Chat{}
+	for rows.Next() {
+		var chat Chat
+		if err := rows.Scan(&chat.ID, &chat.UserID, &chat.Title, &chat.Timestamp); err != nil {
+			log.Println(err)
+			return err
+		}
+		chats = append(chats, chat)
+	}
+
+	return c.JSON(http.StatusOK, chats)
+}
