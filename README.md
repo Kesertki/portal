@@ -392,7 +392,8 @@ curl -X GET "http://localhost:1323/api/chats.list?user_id=some-user-id"
     "id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
     "user_id": "some-user-id",
     "title": "My Chat",
-    "timestamp": 1742551200
+    "timestamp": 1742551200,
+    "is_pinned": false
   }
 ]
 ```
@@ -426,8 +427,8 @@ Example:
 curl -X POST "http://localhost:1323/api/chats.pin" \
   -H "Content-Type: application/json" \
   -d '{
-	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
-	"user_id": "some-user-id"
+    "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+    "user_id": "some-user-id"
   }'
 ```
 
@@ -446,8 +447,8 @@ Example:
 curl -X POST "http://localhost:1323/api/chats.unpin" \
   -H "Content-Type: application/json" \
   -d '{
-	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
-	"user_id": "some-user-id"
+    "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+    "user_id": "some-user-id"
   }'
 ```
 

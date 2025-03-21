@@ -16,6 +16,7 @@ type Chat struct {
 	UserID    string `json:"user_id"`
 	Title     string `json:"title"`
 	Timestamp int64  `json:"timestamp"`
+	IsPinned  bool   `json:"is_pinned"`
 }
 
 type ChatMessage struct {
@@ -130,20 +131,44 @@ func GetChats(c echo.Context) error {
 
 	userID := c.QueryParam("user_id")
 
-	rows, err := db.Query("SELECT id, user_id, title, timestamp FROM chats WHERE user_id = ? ORDER BY timestamp DESC", userID)
+	// rows, err := db.Query("SELECT id, user_id, title, timestamp FROM chats WHERE user_id = ? ORDER BY timestamp DESC", userID)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return err
+	// }
+	// defer rows.Close()
+
+	rows, err := db.Query(`
+		SELECT
+			c.id,
+			c.user_id,
+			c.title,
+			c.timestamp,
+			CASE
+				WHEN cp.id IS NOT NULL THEN 1
+				ELSE 0
+			END AS is_pinned
+		FROM
+			chats c
+		LEFT JOIN
+			chats_pins cp ON c.id = cp.chat_id AND c.user_id = cp.user_id
+		WHERE
+			c.user_id = ?;
+	`, userID)
 	if err != nil {
-		log.Println(err)
-		return err
+		log.Fatal(err)
 	}
 	defer rows.Close()
 
 	chats := []Chat{}
 	for rows.Next() {
 		var chat Chat
-		if err := rows.Scan(&chat.ID, &chat.UserID, &chat.Title, &chat.Timestamp); err != nil {
+		var isPinnedInt int
+		if err := rows.Scan(&chat.ID, &chat.UserID, &chat.Title, &chat.Timestamp, &isPinnedInt); err != nil {
 			log.Println(err)
 			return err
 		}
+		chat.IsPinned = isPinnedInt == 1
 		chats = append(chats, chat)
 	}
 
