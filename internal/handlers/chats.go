@@ -197,6 +197,12 @@ func CreateChatMessage(c echo.Context) error {
 		return err
 	}
 
+	// Update chat timestamp
+	_, err = db.Exec("UPDATE chats SET timestamp = ? WHERE id = ?", chatMessage.Timestamp, chatMessage.ChatID)
+	if err != nil {
+		log.Println(err)
+	}
+
 	return c.JSON(http.StatusCreated, chatMessage)
 }
 
