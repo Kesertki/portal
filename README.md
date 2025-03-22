@@ -18,7 +18,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [Geolocation API](#geolocation-api)
 - [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
 - [x] [Reminders API](#reminders-api)
-- [-] [Chats API](#chats-api)
+- [x] [Chats API](#chats-api)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
