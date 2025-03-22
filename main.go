@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/Kesertki/portal/internal/handlers"
 	"github.com/Kesertki/portal/internal/storage"
@@ -23,15 +25,19 @@ var (
 func main() {
 	fmt.Printf("%s v%s (Commit: %s, Built: %s)\n", "[portal]", Version, GitCommit, BuildDate)
 
+	// Configure zerolog
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Error loading .env file")
+		log.Warn().Msg("Error loading .env file")
 	}
 
 	storage.ApplyMigrations()
 
 	// Log environment variables
-	log.Println("DATA_PATH:", os.Getenv("DATA_PATH"))
+	log.Info().Msgf("DATA_PATH: %s", os.Getenv("DATA_PATH"))
 
 	e := echo.New()
 
@@ -43,7 +49,12 @@ func main() {
 	}))
 
 	// Middleware
-	e.Use(middleware.Logger())
+	// e.Use(middleware.Logger())
+	// Custom logger middleware for Common Log Format (CLF)
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: "${remote_ip} - - [${time_rfc3339}] \"${method} ${uri} ${protocol}\" ${status} ${bytes_out}\n",
+		Output: os.Stderr,
+	}))
 	e.Use(middleware.Recover())
 
 	e.GET("/api/date.now", handlers.GetCurrentDate)
