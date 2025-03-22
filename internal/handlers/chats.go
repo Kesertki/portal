@@ -3,13 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/Kesertki/portal/internal/storage"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/rs/zerolog/log"
 )
 
 type Chat struct {
@@ -49,6 +49,7 @@ type RenameChatRequest struct {
 func CreateChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
@@ -64,7 +65,7 @@ func CreateChat(c echo.Context) error {
 	_, err = db.Exec("INSERT INTO chats(id, user_id, title, timestamp) VALUES(?, ?, ?, ?)",
 		chat.ID, chat.UserID, chat.Title, chat.Timestamp)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to insert chat")
 		return err
 	}
 
@@ -74,20 +75,21 @@ func CreateChat(c echo.Context) error {
 func PinChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
 
 	chatPin := new(ChatPin)
 	if err := c.Bind(chatPin); err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to bind chat pin")
 		return err
 	}
 
 	_, err = db.Exec("INSERT INTO chats_pins(chat_id, user_id) VALUES(?, ?) ON CONFLICT(chat_id, user_id) DO NOTHING",
 		chatPin.ChatID, chatPin.UserID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to pin chat")
 		return err
 	}
 
@@ -97,19 +99,20 @@ func PinChat(c echo.Context) error {
 func UnpinChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
 
 	chatPin := new(ChatPin)
 	if err := c.Bind(chatPin); err != nil {
-		log.Panicln(err)
+		log.Fatal().Err(err).Msg("Failed to bind chat pin")
 		return err
 	}
 
 	_, err = db.Exec("DELETE FROM chats_pins WHERE chat_id = ? AND user_id = ?", chatPin.ChatID, chatPin.UserID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to unpin chat")
 		return err
 	}
 
@@ -119,25 +122,26 @@ func UnpinChat(c echo.Context) error {
 func DeleteChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
 
 	deleteChatRequest := new(DeleteChatRequest)
 	if err := c.Bind(deleteChatRequest); err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Invalid request")
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 	}
 
 	result, err := db.Exec("DELETE FROM chats WHERE id = ? AND user_id = ?", deleteChatRequest.ChatID, deleteChatRequest.UserID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Internal server error")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Internal server error")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
@@ -151,25 +155,26 @@ func DeleteChat(c echo.Context) error {
 func RenameChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
 
 	renameChatRequest := new(RenameChatRequest)
 	if err := c.Bind(renameChatRequest); err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Invalid request")
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
 	}
 
 	result, err := db.Exec("UPDATE chats SET title = ? WHERE id = ? AND user_id = ?", renameChatRequest.Title, renameChatRequest.ChatID, renameChatRequest.UserID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Internal server error")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Internal server error")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
@@ -183,18 +188,12 @@ func RenameChat(c echo.Context) error {
 func GetChats(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
 
 	userID := c.QueryParam("user_id")
-
-	// rows, err := db.Query("SELECT id, user_id, title, timestamp FROM chats WHERE user_id = ? ORDER BY timestamp DESC", userID)
-	// if err != nil {
-	// 	log.Println(err)
-	// 	return err
-	// }
-	// defer rows.Close()
 
 	rows, err := db.Query(`
 		SELECT
@@ -214,7 +213,7 @@ func GetChats(c echo.Context) error {
 			c.user_id = ?;
 	`, userID)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Failed to query chats")
 	}
 	defer rows.Close()
 
@@ -223,7 +222,7 @@ func GetChats(c echo.Context) error {
 		var chat Chat
 		var isPinnedInt int
 		if err := rows.Scan(&chat.ID, &chat.UserID, &chat.Title, &chat.Timestamp, &isPinnedInt); err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("Failed to scan chat")
 			return err
 		}
 		chat.IsPinned = isPinnedInt == 1
@@ -236,6 +235,7 @@ func GetChats(c echo.Context) error {
 func CreateChatMessage(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
@@ -251,14 +251,14 @@ func CreateChatMessage(c echo.Context) error {
 	_, err = db.Exec("INSERT INTO messages (id, chat_id, sender, sender_role, content, timestamp, tools) VALUES(?, ?, ?, ?, ?, ?, ?)",
 		chatMessage.ID, chatMessage.ChatID, chatMessage.Sender, chatMessage.SenderRole, chatMessage.Content, chatMessage.Timestamp, chatMessage.Tools)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to insert chat message")
 		return err
 	}
 
 	// Update chat timestamp
 	_, err = db.Exec("UPDATE chats SET timestamp = ? WHERE id = ?", chatMessage.Timestamp, chatMessage.ChatID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to update chat timestamp")
 	}
 
 	return c.JSON(http.StatusCreated, chatMessage)
@@ -267,6 +267,7 @@ func CreateChatMessage(c echo.Context) error {
 func GetChatInfo(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
@@ -297,7 +298,7 @@ func GetChatInfo(c echo.Context) error {
 		if err == sql.ErrNoRows {
 			return c.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
 		}
-		log.Println("Error scanning row:", err)
+		log.Error().Err(err).Msg("Failed to scan chat info")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
 	}
 
@@ -307,6 +308,7 @@ func GetChatInfo(c echo.Context) error {
 func GetChatMessages(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
+		log.Error().Msg("Storage connection failed")
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
 	defer db.Close()
@@ -314,7 +316,7 @@ func GetChatMessages(c echo.Context) error {
 	chatID := c.QueryParam("chat_id")
 	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, tools FROM messages WHERE chat_id = ? ORDER BY timestamp", chatID)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("Failed to query chat messages")
 		return err
 	}
 	defer rows.Close()
@@ -324,7 +326,7 @@ func GetChatMessages(c echo.Context) error {
 		var message ChatMessage
 		var tools []byte // Use a byte slice to scan the JSON string
 		if err := rows.Scan(&message.ID, &message.ChatID, &message.Sender, &message.SenderRole, &message.Content, &message.Timestamp, &tools); err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("Failed to scan chat message")
 			return err
 		}
 		if tools != nil {
