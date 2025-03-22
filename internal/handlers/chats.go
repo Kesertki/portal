@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -204,6 +205,46 @@ func CreateChatMessage(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, chatMessage)
+}
+
+func GetChatInfo(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	chatID := c.QueryParam("chat_id")
+	userID := c.QueryParam("user_id")
+
+	row := db.QueryRow(`
+		SELECT
+			c.id,
+			c.user_id,
+			c.title,
+			c.timestamp,
+			CASE
+				WHEN cp.id IS NOT NULL THEN 1
+				ELSE 0
+			END AS is_pinned
+		FROM
+			chats c
+		LEFT JOIN
+			chats_pins cp ON c.id = cp.chat_id AND c.user_id = cp.user_id
+		WHERE
+			c.user_id = ? AND c.id = ?;
+	`, userID, chatID)
+
+	var chat Chat
+	if err := row.Scan(&chat.ID, &chat.UserID, &chat.Title, &chat.Timestamp, &chat.IsPinned); err != nil {
+		if err == sql.ErrNoRows {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
+		}
+		log.Println("Error scanning row:", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, chat)
 }
 
 func GetChatMessages(c echo.Context) error {

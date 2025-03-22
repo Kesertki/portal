@@ -333,6 +333,7 @@ curl -X POST http://localhost:1323/api/reminders.add \
 
 - [POST /chats.add](#post-chatsadd)
 - [GET /chats.list](#get-chatslist)
+- [GET /chats.info](#get-chatsinfo)
 - [POST /chats.delete](#post-chatsdelete)
 - [POST /chats.pin](#post-chatspin)
 - [POST /chats.unpin](#post-chatsunpin)
@@ -395,6 +396,33 @@ curl -X GET "http://localhost:1323/api/chats.list?user_id=some-user-id"
     "is_pinned": false
   }
 ]
+```
+
+#### GET /chats.info
+
+Returns information about a specific chat.
+
+Parameters:
+
+- `chat_id`: The chat ID
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/chats.info?chat_id=d6924d7f-e53d-452e-83a0-0f0893de68b5&user_id=some-user-id"
+```
+
+Response:
+
+```json
+{
+  "id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+  "user_id": "some-user-id",
+  "title": "My Chat",
+  "timestamp": 1742551200,
+  "is_pinned": false
+}
 ```
 
 #### POST /chats.delete

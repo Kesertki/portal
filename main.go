@@ -67,6 +67,7 @@ func main() {
 	e.GET("/api/chats.list", handlers.GetChats)
 	e.POST("/api/chats.pin", handlers.PinChat)
 	e.POST("/api/chats.unpin", handlers.UnpinChat)
+	e.GET("/api/chats.info", handlers.GetChatInfo)
 	e.POST("/api/messages.add", handlers.CreateChatMessage)
 	e.GET("/api/messages.list", handlers.GetChatMessages)
 
