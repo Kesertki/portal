@@ -312,7 +312,7 @@ func GetChatMessages(c echo.Context) error {
 	defer db.Close()
 
 	chatID := c.QueryParam("chat_id")
-	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, tools FROM messages WHERE chat_id = ? ORDER BY timestamp DESC", chatID)
+	rows, err := db.Query("SELECT id, chat_id, sender, sender_role, content, timestamp, tools FROM messages WHERE chat_id = ? ORDER BY timestamp", chatID)
 	if err != nil {
 		log.Println(err)
 		return err
