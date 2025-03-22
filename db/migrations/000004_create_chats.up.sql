@@ -25,7 +25,7 @@ CREATE TABLE messages (
 );
 
 CREATE INDEX idx_chats_user_id ON chats(user_id);
-CREATE INDEX idx_chats_pinned_user_id ON chats_pinned(user_id);
+CREATE INDEX idx_chats_pinned_user_id ON chats_pins(user_id);
 
 CREATE INDEX idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX idx_messages_timestamp ON messages(timestamp);
