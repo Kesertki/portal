@@ -335,6 +335,7 @@ curl -X POST http://localhost:1323/api/reminders.add \
 - [GET /chats.list](#get-chatslist)
 - [GET /chats.info](#get-chatsinfo)
 - [POST /chats.delete](#post-chatsdelete)
+- [POST /chats.rename](#post-chatsrename)
 - [POST /chats.pin](#post-chatspin)
 - [POST /chats.unpin](#post-chatsunpin)
 - [POST /messages.add](#post-messagesadd)
@@ -429,14 +430,42 @@ Response:
 
 Deletes a chat.
 
-Parameters:
+Request body:
 
-- `id`: The chat ID
+- `user_id`: The user ID
+- `chat_id`: The chat ID
 
 Example:
 
 ```shell
-curl -X POST "http://localhost:1323/api/chats.delete?id=123"
+curl -X POST "http://localhost:1323/api/chats.delete" \
+  -H "Content-Type: application/json" \
+  -d '{
+	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+	"user_id": "some-user-id"
+  }'
+```
+
+#### POST /chats.rename
+
+Renames a chat.
+
+Request body:
+
+- `user_id`: The user ID
+- `chat_id`: The chat ID
+- `title`: The new chat title
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chats.rename" \
+  -H "Content-Type: application/json" \
+  -d '{
+	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+	"user_id": "some-user-id",
+	"title": "New Chat Title"
+  }'
 ```
 
 #### POST /chats.pin

@@ -35,6 +35,17 @@ type ChatPin struct {
 	UserID string `json:"user_id"`
 }
 
+type DeleteChatRequest struct {
+	ChatID string `json:"chat_id"`
+	UserID string `json:"user_id"`
+}
+
+type RenameChatRequest struct {
+	ChatID string `json:"chat_id"`
+	UserID string `json:"user_id"`
+	Title  string `json:"title"`
+}
+
 func CreateChat(c echo.Context) error {
 	db, err := storage.ConnectToStorage()
 	if err != nil {
@@ -112,12 +123,58 @@ func DeleteChat(c echo.Context) error {
 	}
 	defer db.Close()
 
-	chatID := c.QueryParam("id")
+	deleteChatRequest := new(DeleteChatRequest)
+	if err := c.Bind(deleteChatRequest); err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
 
-	_, err = db.Exec("DELETE FROM chats WHERE id = ?", chatID)
+	result, err := db.Exec("DELETE FROM chats WHERE id = ? AND user_id = ?", deleteChatRequest.ChatID, deleteChatRequest.UserID)
 	if err != nil {
 		log.Println(err)
-		return err
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+	}
+
+	if rowsAffected == 0 {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func RenameChat(c echo.Context) error {
+	db, err := storage.ConnectToStorage()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
+	}
+	defer db.Close()
+
+	renameChatRequest := new(RenameChatRequest)
+	if err := c.Bind(renameChatRequest); err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+	}
+
+	result, err := db.Exec("UPDATE chats SET title = ? WHERE id = ? AND user_id = ?", renameChatRequest.Title, renameChatRequest.ChatID, renameChatRequest.UserID)
+	if err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Println(err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+	}
+
+	if rowsAffected == 0 {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "Chat not found"})
 	}
 
 	return c.NoContent(http.StatusOK)
