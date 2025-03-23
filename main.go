@@ -3,11 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -99,14 +96,7 @@ func main() {
 
 	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
 
-	// File System API
-	log.Info().Msg("Initializing File System API")
-	fsGroup := e.Group("/api/fs")
-	fsGroup.POST("/files", func(c echo.Context) error { return createFile(c, db) })
-	fsGroup.GET("/files/*", func(c echo.Context) error { return readFile(c, db) })
-	fsGroup.PUT("/files/*", func(c echo.Context) error { return updateFile(c, db) })
-	fsGroup.DELETE("/files/*", func(c echo.Context) error { return deleteFile(c, db) })
-	fsGroup.GET("/list/*", func(c echo.Context) error { return listDirectory(c, db) })
+	handlers.SetupFileSystemApiHandlers(e, "/api/fs", db)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
@@ -119,8 +109,6 @@ func main() {
 
 	e.Logger.Fatal(e.Start(":1323"))
 }
-
-// FS API prototype
 
 // Create a new user
 func createUser(c echo.Context, db *sql.DB) error {
@@ -139,244 +127,4 @@ func createUser(c echo.Context, db *sql.DB) error {
 	}
 
 	return c.JSON(http.StatusCreated, map[string]string{"id": id, "name": name, "email": email})
-}
-
-// Create a new file
-func createFile(c echo.Context, db *sql.DB) error {
-	file, err := c.FormFile("file")
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to bind file")
-		return c.String(http.StatusBadRequest, "Bad Request")
-	}
-
-	src, err := file.Open()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to open file")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-	defer src.Close()
-
-	userID := c.FormValue("user_id")
-	filePath := filepath.Join(c.FormValue("path"), file.Filename)
-	fileSize := file.Size
-
-	// Ensure the path has a leading slash
-	if !strings.HasPrefix(filePath, "/") {
-		filePath = "/" + filePath
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to start transaction")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-	defer tx.Rollback()
-
-	res, err := tx.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to insert file metadata")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	fileID, err := res.LastInsertId()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get last insert ID")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	chunkSize := 1024 * 1024 // 1MB chunks
-	chunkIndex := 0
-	buffer := make([]byte, chunkSize)
-
-	for {
-		n, err := src.Read(buffer)
-		if err != nil && err != io.EOF {
-			log.Error().Err(err).Msg("Failed to read file content")
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		if n == 0 {
-			break
-		}
-
-		_, err = tx.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to insert file content")
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		chunkIndex++
-	}
-
-	if err := tx.Commit(); err != nil {
-		log.Error().Err(err).Msg("Failed to commit transaction")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	return c.String(http.StatusOK, "File created successfully")
-}
-
-// Read a file
-func readFile(c echo.Context, db *sql.DB) error {
-	userID := c.QueryParam("user_id")
-	filePath := c.Param("*")
-
-	// Ensure the path has a leading slash
-	if !strings.HasPrefix(filePath, "/") {
-		filePath = "/" + filePath
-	}
-
-	log.Info().Msgf("Reading file for userID: %s, filePath: %s", userID, filePath)
-
-	var fileID int64
-	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
-	if err != nil {
-		log.Error().Err(err).Msg("File not found")
-		return c.String(http.StatusNotFound, "File not found")
-	}
-	log.Info().Msgf("File ID: %d", fileID)
-
-	rows, err := db.Query("SELECT content FROM file_content WHERE file_id = ? ORDER BY chunk_index", fileID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to get file content")
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-	defer rows.Close()
-
-	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEOctetStream)
-	for rows.Next() {
-		var chunk []byte
-		if err := rows.Scan(&chunk); err != nil {
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		if _, err := c.Response().Write(chunk); err != nil {
-			log.Error().Err(err).Msg("Failed to write file content")
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Update a file
-func updateFile(c echo.Context, db *sql.DB) error {
-	userID := c.FormValue("user_id")
-	filePath := c.Param("*")
-
-	// Ensure the path has a leading slash
-	if !strings.HasPrefix(filePath, "/") {
-		filePath = "/" + filePath
-	}
-
-	file, err := c.FormFile("file")
-	if err != nil {
-		return c.String(http.StatusBadRequest, "Bad Request")
-	}
-
-	src, err := file.Open()
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-	defer src.Close()
-
-	var fileID int64
-	err = db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
-	if err != nil {
-		return c.String(http.StatusNotFound, "File not found")
-	}
-
-	// Delete existing content
-	_, err = db.Exec("DELETE FROM file_content WHERE file_id = ?", fileID)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	// Insert new file content in chunks
-	chunkSize := 1024 * 1024 // 1MB chunks
-	chunkIndex := 0
-	buffer := make([]byte, chunkSize)
-
-	for {
-		n, err := src.Read(buffer)
-		if err != nil && err != io.EOF {
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		if n == 0 {
-			break
-		}
-
-		_, err = db.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
-		if err != nil {
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		chunkIndex++
-	}
-
-	// Update file metadata
-	_, err = db.Exec("UPDATE files SET size = ?, created_at = ? WHERE id = ?", file.Size, time.Now(), fileID)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	return c.String(http.StatusOK, "File updated successfully")
-}
-
-// Delete a file
-func deleteFile(c echo.Context, db *sql.DB) error {
-	userID := c.QueryParam("user_id")
-	filePath := c.Param("*")
-
-	// Ensure the path has a leading slash
-	if !strings.HasPrefix(filePath, "/") {
-		filePath = "/" + filePath
-	}
-
-	var fileID int64
-	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
-	if err != nil {
-		return c.String(http.StatusNotFound, "File not found")
-	}
-
-	_, err = db.Exec("DELETE FROM file_content WHERE file_id = ?", fileID)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	_, err = db.Exec("DELETE FROM files WHERE id = ?", fileID)
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-
-	return c.String(http.StatusOK, "File deleted successfully")
-}
-
-// List directory contents
-func listDirectory(c echo.Context, db *sql.DB) error {
-	userID := c.QueryParam("user_id")
-	dirPath := c.Param("*")
-
-	// Ensure the path has a leading slash
-	if !strings.HasPrefix(dirPath, "/") {
-		dirPath = "/" + dirPath
-	}
-
-	// Ensure the path ends with a slash to denote a directory
-	if !strings.HasSuffix(dirPath, "/") {
-		dirPath += "/"
-	}
-
-	rows, err := db.Query("SELECT filename FROM files WHERE user_id = ? AND path LIKE ?", userID, dirPath+"%")
-	if err != nil {
-		return c.String(http.StatusInternalServerError, "Internal Server Error")
-	}
-	defer rows.Close()
-
-	var files []string
-	for rows.Next() {
-		var filename string
-		if err := rows.Scan(&filename); err != nil {
-			return c.String(http.StatusInternalServerError, "Internal Server Error")
-		}
-		files = append(files, filename)
-	}
-
-	return c.JSON(http.StatusOK, files)
 }
