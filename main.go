@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -120,23 +121,34 @@ func main() {
 
 // Create a new user
 func createUser(c echo.Context, db *sql.DB) error {
-	username := c.FormValue("username")
-	_, err := db.Exec("INSERT INTO users (username) VALUES (?)", username)
+	name := c.FormValue("name")
+	email := c.FormValue("email")
+
+	id := c.FormValue("id")
+	if id == "" {
+		id = uuid.New().String()
+	}
+
+	_, err := db.Exec("INSERT INTO users (id, name, email) VALUES (?, ?, ?)", id, name, email)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to create user")
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
-	return c.String(http.StatusOK, "User created successfully")
+
+	return c.JSON(http.StatusCreated, map[string]string{"id": id, "name": name, "email": email})
 }
 
 // Create a new file
 func createFile(c echo.Context, db *sql.DB) error {
 	file, err := c.FormFile("file")
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to bind file")
 		return c.String(http.StatusBadRequest, "Bad Request")
 	}
 
 	src, err := file.Open()
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to open file")
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 	defer src.Close()
@@ -145,18 +157,30 @@ func createFile(c echo.Context, db *sql.DB) error {
 	filePath := filepath.Join(c.FormValue("path"), file.Filename)
 	fileSize := file.Size
 
-	// Insert file metadata
-	res, err := db.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
+	// Ensure the path has a leading slash
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = "/" + filePath
+	}
+
+	tx, err := db.Begin()
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to start transaction")
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to insert file metadata")
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 
 	fileID, err := res.LastInsertId()
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get last insert ID")
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 
-	// Insert file content in chunks
 	chunkSize := 1024 * 1024 // 1MB chunks
 	chunkIndex := 0
 	buffer := make([]byte, chunkSize)
@@ -164,17 +188,24 @@ func createFile(c echo.Context, db *sql.DB) error {
 	for {
 		n, err := src.Read(buffer)
 		if err != nil && err != io.EOF {
+			log.Error().Err(err).Msg("Failed to read file content")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
 		if n == 0 {
 			break
 		}
 
-		_, err = db.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
+		_, err = tx.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
 		if err != nil {
+			log.Error().Err(err).Msg("Failed to insert file content")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
 		chunkIndex++
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Error().Err(err).Msg("Failed to commit transaction")
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 
 	return c.String(http.StatusOK, "File created successfully")
@@ -184,14 +215,25 @@ func createFile(c echo.Context, db *sql.DB) error {
 func readFile(c echo.Context, db *sql.DB) error {
 	userID := c.QueryParam("user_id")
 	filePath := c.Param("*")
+
+	// Ensure the path has a leading slash
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = "/" + filePath
+	}
+
+	log.Info().Msgf("Reading file for userID: %s, filePath: %s", userID, filePath)
+
 	var fileID int64
 	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
 	if err != nil {
+		log.Error().Err(err).Msg("File not found")
 		return c.String(http.StatusNotFound, "File not found")
 	}
+	log.Info().Msgf("File ID: %d", fileID)
 
 	rows, err := db.Query("SELECT content FROM file_content WHERE file_id = ? ORDER BY chunk_index", fileID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to get file content")
 		return c.String(http.StatusInternalServerError, "Internal Server Error")
 	}
 	defer rows.Close()
@@ -203,6 +245,7 @@ func readFile(c echo.Context, db *sql.DB) error {
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
 		if _, err := c.Response().Write(chunk); err != nil {
+			log.Error().Err(err).Msg("Failed to write file content")
 			return err
 		}
 	}
@@ -214,6 +257,12 @@ func readFile(c echo.Context, db *sql.DB) error {
 func updateFile(c echo.Context, db *sql.DB) error {
 	userID := c.FormValue("user_id")
 	filePath := c.Param("*")
+
+	// Ensure the path has a leading slash
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = "/" + filePath
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		return c.String(http.StatusBadRequest, "Bad Request")
@@ -271,6 +320,12 @@ func updateFile(c echo.Context, db *sql.DB) error {
 func deleteFile(c echo.Context, db *sql.DB) error {
 	userID := c.QueryParam("user_id")
 	filePath := c.Param("*")
+
+	// Ensure the path has a leading slash
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = "/" + filePath
+	}
+
 	var fileID int64
 	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
 	if err != nil {
@@ -294,6 +349,11 @@ func deleteFile(c echo.Context, db *sql.DB) error {
 func listDirectory(c echo.Context, db *sql.DB) error {
 	userID := c.QueryParam("user_id")
 	dirPath := c.Param("*")
+
+	// Ensure the path has a leading slash
+	if !strings.HasPrefix(dirPath, "/") {
+		dirPath = "/" + dirPath
+	}
 
 	// Ensure the path ends with a slash to denote a directory
 	if !strings.HasSuffix(dirPath, "/") {
