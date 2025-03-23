@@ -22,6 +22,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
+- [ ] File System API
 - [ ] Plugins API
 
 ## Running from Source
