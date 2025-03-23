@@ -90,7 +90,7 @@ func main() {
 	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
 
 	handlers.SetupChatApiHandlers(apiGroup, db)
-	handlers.SetupFileSystemApiHandlers(e, "/api/fs", db)
+	handlers.SetupFileSystemApiHandlers(apiGroup, db)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")

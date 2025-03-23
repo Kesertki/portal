@@ -275,10 +275,10 @@ func ListDirectoryHandler(db *sql.DB) echo.HandlerFunc {
 }
 
 // SetupFileSystemApiHandlers sets up the file system API handlers
-func SetupFileSystemApiHandlers(e *echo.Echo, groupPath string, db *sql.DB) {
+func SetupFileSystemApiHandlers(apiGroup *echo.Group, db *sql.DB) {
 	log.Info().Msg("Initializing File System API")
 
-	fsGroup := e.Group(groupPath)
+	fsGroup := apiGroup.Group("/fs")
 	fsGroup.POST("/files", CreateFileHandler(db))
 	fsGroup.GET("/files/*", ReadFileHandler(db))
 	fsGroup.PUT("/files/*", UpdateFileHandler(db))
