@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/afero"
 
 	"github.com/Kesertki/portal/internal/handlers"
 	"github.com/Kesertki/portal/internal/storage"
@@ -83,16 +84,45 @@ func main() {
 	e.POST("/api/messages.add", handlers.CreateChatMessage)
 	e.GET("/api/messages.list", handlers.GetChatMessages)
 
-	// Create a new WebSocket handler
+	log.Info().Msg("Starting File System API")
+	// Create a new Afero file system (you can replace this with any other Afero-supported file system)
+	// fs := afero.NewOsFs()
+	fs := afero.NewMemMapFs()
+
+	// Create test files and directories
+	err = fs.MkdirAll("src/a", 0755)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create directory")
+	}
+	err = afero.WriteFile(fs, "src/a/b", []byte("file b"), 0644)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to write file")
+	}
+	err = afero.WriteFile(fs, "src/c", []byte("file c"), 0644)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to write file")
+	}
+
+	afero.Walk(fs, "", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			e.Logger.Error(err)
+			return nil
+		}
+		log.Info().Msgf("File: %s", path)
+		return nil
+	})
+
+	httpFs := afero.NewHttpFs(fs)
+	fileServer := http.FileServer(httpFs.Dir(""))
+	e.GET("/api/fs/*", echo.WrapHandler(http.StripPrefix("/api/fs/", fileServer)))
+
+	// Start WebSocket handler
+	log.Info().Msg("Starting WebSocket handler")
 	wsHandler := handlers.NewWebSocketHandler()
-
-	// Start the broadcasting process
 	wsHandler.StartBroadcasting()
-
-	// Routes
 	e.GET("/ws", wsHandler.HandleWebSocket)
 
-	// go handlers.HandleMessages(clients, broadcast)
+	// Start reminders agent
 	go handlers.StartRemindersAgent(wsHandler)
 
 	e.Logger.Fatal(e.Start(":1323"))
