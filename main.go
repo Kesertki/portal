@@ -81,14 +81,9 @@ func main() {
 	apiGroup := e.Group("/api")
 	// apiGroup.GET("/version", handlers.GetVersion)
 
-	e.GET("/api/reminders.list", handlers.GetReminders)
-	e.POST("/api/reminders.add", handlers.CreateReminder)
-	e.POST("/api/reminders.complete", handlers.CompleteReminder)
-	e.POST("/api/reminders.delete", handlers.DeleteReminder)
-	e.GET("/api/reminders.info", handlers.GetReminderInfo)
-
 	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
 
+	handlers.SetupReminderApiHandlers(apiGroup, db)
 	handlers.SetupChatApiHandlers(apiGroup, db)
 	handlers.SetupFileSystemApiHandlers(apiGroup, db)
 

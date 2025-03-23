@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,112 +24,97 @@ type Reminder struct {
 	WebhookURL  string    `json:"webhook_url"`
 }
 
-func CreateReminder(c echo.Context) error {
-	db, err := storage.ConnectToStorage()
-	if err != nil {
-		log.Error().Msg("Storage connection failed")
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
-	}
-	defer db.Close()
+func SetupReminderApiHandlers(apiGroup *echo.Group, db *sql.DB) {
+	log.Info().Msg("Initializing Reminders API")
 
-	reminder := new(Reminder)
-	if err := c.Bind(reminder); err != nil {
-		return err
-	}
-
-	reminder.ID = uuid.New().String()
-
-	_, err = db.Exec("INSERT INTO reminders(id, message, description, due_time, completed, webhook_url) VALUES(?, ?, ?, ?, ?, ?)",
-		reminder.ID, reminder.Message, reminder.Description, reminder.DueTime, reminder.Completed, reminder.WebhookURL)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to insert reminder")
-		return err
-	}
-
-	return c.JSON(http.StatusCreated, reminder)
+	apiGroup.POST("/reminders.add", CreateReminderHandler(db))
+	apiGroup.GET("/reminders.list", ListRemindersHandler(db))
+	apiGroup.POST("/reminders.complete", CompleteReminderHandler(db))
+	apiGroup.POST("/reminders.delete", DeleteReminderHandler(db))
+	apiGroup.GET("/reminders.info", GetReminderInfoHandler(db))
 }
 
-func GetReminders(c echo.Context) error {
-	db, err := storage.ConnectToStorage()
-	if err != nil {
-		log.Error().Msg("Storage connection failed")
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
-	}
-	defer db.Close()
+func CreateReminderHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		reminder := new(Reminder)
+		if err := c.Bind(reminder); err != nil {
+			return err
+		}
 
-	rows, err := db.Query("SELECT id, message, description, due_time, completed, webhook_url FROM reminders")
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to query reminders")
-		return err
-	}
-	defer rows.Close()
+		reminder.ID = uuid.New().String()
 
-	reminders := []Reminder{}
-	for rows.Next() {
+		_, err := db.Exec("INSERT INTO reminders(id, message, description, due_time, completed, webhook_url) VALUES(?, ?, ?, ?, ?, ?)",
+			reminder.ID, reminder.Message, reminder.Description, reminder.DueTime, reminder.Completed, reminder.WebhookURL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to insert reminder")
+			return err
+		}
+
+		return c.JSON(http.StatusCreated, reminder)
+	}
+}
+
+func ListRemindersHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		rows, err := db.Query("SELECT id, message, description, due_time, completed, webhook_url FROM reminders")
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to query reminders")
+			return err
+		}
+		defer rows.Close()
+
+		reminders := []Reminder{}
+		for rows.Next() {
+			var r Reminder
+			if err := rows.Scan(&r.ID, &r.Message, &r.Description, &r.DueTime, &r.Completed, &r.WebhookURL); err != nil {
+				log.Error().Err(err).Msg("Failed to scan reminder")
+				return err
+			}
+			reminders = append(reminders, r)
+		}
+		return c.JSON(http.StatusOK, reminders)
+	}
+}
+
+func CompleteReminderHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.QueryParam("id")
+		_, err := db.Exec("UPDATE reminders SET completed = TRUE WHERE id = ?", id)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to update reminder")
+			return err
+		}
+
+		return c.NoContent(http.StatusOK)
+	}
+}
+
+func DeleteReminderHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.QueryParam("id")
+		_, err := db.Exec("DELETE FROM reminders WHERE id = ?", id)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to delete reminder")
+			return err
+		}
+
+		return c.NoContent(http.StatusOK)
+	}
+}
+
+func GetReminderInfoHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		id := c.QueryParam("id")
+		row := db.QueryRow("SELECT id, message, description, due_time, completed, webhook_url FROM reminders WHERE id = ?", id)
+
 		var r Reminder
-		if err := rows.Scan(&r.ID, &r.Message, &r.Description, &r.DueTime, &r.Completed, &r.WebhookURL); err != nil {
+		if err := row.Scan(&r.ID, &r.Message, &r.Description, &r.DueTime, &r.Completed, &r.WebhookURL); err != nil {
 			log.Error().Err(err).Msg("Failed to scan reminder")
 			return err
 		}
-		reminders = append(reminders, r)
+
+		return c.JSON(http.StatusOK, r)
 	}
-	return c.JSON(http.StatusOK, reminders)
-}
-
-func CompleteReminder(c echo.Context) error {
-	db, err := storage.ConnectToStorage()
-	if err != nil {
-		log.Error().Msg("Storage connection failed")
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
-	}
-	defer db.Close()
-
-	id := c.QueryParam("id")
-	_, err = db.Exec("UPDATE reminders SET completed = TRUE WHERE id = ?", id)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to update reminder")
-		return err
-	}
-
-	return c.NoContent(http.StatusOK)
-}
-
-func DeleteReminder(c echo.Context) error {
-	db, err := storage.ConnectToStorage()
-	if err != nil {
-		log.Error().Msg("Storage connection failed")
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
-	}
-	defer db.Close()
-
-	id := c.QueryParam("id")
-	_, err = db.Exec("DELETE FROM reminders WHERE id = ?", id)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to delete reminder")
-		return err
-	}
-
-	return c.NoContent(http.StatusOK)
-}
-
-func GetReminderInfo(c echo.Context) error {
-	db, err := storage.ConnectToStorage()
-	if err != nil {
-		log.Error().Msg("Storage connection failed")
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
-	}
-	defer db.Close()
-
-	id := c.QueryParam("id")
-	row := db.QueryRow("SELECT id, message, description, due_time, completed, webhook_url FROM reminders WHERE id = ?", id)
-
-	var r Reminder
-	if err := row.Scan(&r.ID, &r.Message, &r.Description, &r.DueTime, &r.Completed, &r.WebhookURL); err != nil {
-		log.Error().Err(err).Msg("Failed to scan reminder")
-		return err
-	}
-
-	return c.JSON(http.StatusOK, r)
 }
 
 func notifyWebhook(reminder Reminder, webhookURL string) error {
