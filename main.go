@@ -85,9 +85,26 @@ func main() {
 	e.GET("/api/messages.list", handlers.GetChatMessages)
 
 	log.Info().Msg("Starting File System API")
-	// Create a new Afero file system (you can replace this with any other Afero-supported file system)
-	// fs := afero.NewOsFs()
-	fs := afero.NewMemMapFs()
+	// baseFs := afero.NewOsFs()
+	// fs := afero.NewBasePathFs(baseFs, "data/fs")
+	// fs := afero.NewMemMapFs()
+
+	// Create the base filesystem (read-only)
+	baseFs := afero.NewOsFs()
+	roBase := afero.NewReadOnlyFs(baseFs)
+
+	// Create the writable overlay filesystem
+	overlayFs := afero.NewMemMapFs()
+
+	// Combine them using CopyOnWriteFs
+	ufs := afero.NewCopyOnWriteFs(roBase, overlayFs)
+
+	// Create a new base path filesystem
+	fs := afero.NewBasePathFs(ufs, "data/fs")
+
+	httpFs := afero.NewHttpFs(fs)
+	fileServer := http.FileServer(httpFs.Dir(""))
+	e.GET("/api/fs/*", echo.WrapHandler(http.StripPrefix("/api/fs/", fileServer)))
 
 	// Create test files and directories
 	err = fs.MkdirAll("src/a", 0755)
@@ -111,10 +128,6 @@ func main() {
 		log.Info().Msgf("File: %s", path)
 		return nil
 	})
-
-	httpFs := afero.NewHttpFs(fs)
-	fileServer := http.FileServer(httpFs.Dir(""))
-	e.GET("/api/fs/*", echo.WrapHandler(http.StripPrefix("/api/fs/", fileServer)))
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
