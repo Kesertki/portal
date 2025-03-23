@@ -97,13 +97,16 @@ func main() {
 	}
 	defer db.Close()
 
+	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
+
 	// File System API
-	e.POST("/users", func(c echo.Context) error { return createUser(c, db) })
-	e.POST("/files", func(c echo.Context) error { return createFile(c, db) })
-	e.GET("/files/*", func(c echo.Context) error { return readFile(c, db) })
-	e.PUT("/files/*", func(c echo.Context) error { return updateFile(c, db) })
-	e.DELETE("/files/*", func(c echo.Context) error { return deleteFile(c, db) })
-	e.GET("/list/*", func(c echo.Context) error { return listDirectory(c, db) })
+	log.Info().Msg("Initializing File System API")
+	fsGroup := e.Group("/api/fs")
+	fsGroup.POST("/files", func(c echo.Context) error { return createFile(c, db) })
+	fsGroup.GET("/files/*", func(c echo.Context) error { return readFile(c, db) })
+	fsGroup.PUT("/files/*", func(c echo.Context) error { return updateFile(c, db) })
+	fsGroup.DELETE("/files/*", func(c echo.Context) error { return deleteFile(c, db) })
+	fsGroup.GET("/list/*", func(c echo.Context) error { return listDirectory(c, db) })
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
