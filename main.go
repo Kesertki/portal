@@ -1,11 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -22,10 +24,12 @@ var (
 	GitCommit = "unknown"
 )
 
+const dbPath = "./data/portal.db"
+
 func main() {
 	fmt.Printf("%s v%s (Commit: %s, Built: %s)\n", "[portal]", Version, GitCommit, BuildDate)
 
-	// Configure zerolog
+	// Configure logger
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
@@ -38,6 +42,13 @@ func main() {
 
 	// Log environment variables
 	log.Info().Msgf("DATA_PATH: %s", os.Getenv("DATA_PATH"))
+
+	// Initialize database
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to open database")
+	}
+	defer db.Close()
 
 	e := echo.New()
 
@@ -67,33 +78,42 @@ func main() {
 
 	e.Static("/", "public")
 
-	e.GET("/api/reminders.list", handlers.GetReminders)
-	e.POST("/api/reminders.add", handlers.CreateReminder)
-	e.POST("/api/reminders.complete", handlers.CompleteReminder)
-	e.POST("/api/reminders.delete", handlers.DeleteReminder)
-	e.GET("/api/reminders.info", handlers.GetReminderInfo)
+	apiGroup := e.Group("/api")
+	// apiGroup.GET("/version", handlers.GetVersion)
 
-	e.POST("/api/chats.add", handlers.CreateChat)
-	e.POST("/api/chats.delete", handlers.DeleteChat)
-	e.POST("/api/chats.rename", handlers.RenameChat)
-	e.GET("/api/chats.list", handlers.GetChats)
-	e.POST("/api/chats.pin", handlers.PinChat)
-	e.POST("/api/chats.unpin", handlers.UnpinChat)
-	e.GET("/api/chats.info", handlers.GetChatInfo)
-	e.POST("/api/messages.add", handlers.CreateChatMessage)
-	e.GET("/api/messages.list", handlers.GetChatMessages)
+	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
 
-	// Create a new WebSocket handler
+	handlers.SetupReminderApiHandlers(apiGroup, db)
+	handlers.SetupChatApiHandlers(apiGroup, db)
+	handlers.SetupFileSystemApiHandlers(apiGroup, db)
+
+	// Start WebSocket handler
+	log.Info().Msg("Starting WebSocket handler")
 	wsHandler := handlers.NewWebSocketHandler()
-
-	// Start the broadcasting process
 	wsHandler.StartBroadcasting()
-
-	// Routes
 	e.GET("/ws", wsHandler.HandleWebSocket)
 
-	// go handlers.HandleMessages(clients, broadcast)
+	// Start reminders agent
 	go handlers.StartRemindersAgent(wsHandler)
 
 	e.Logger.Fatal(e.Start(":1323"))
+}
+
+// Create a new user
+func createUser(c echo.Context, db *sql.DB) error {
+	name := c.FormValue("name")
+	email := c.FormValue("email")
+
+	id := c.FormValue("id")
+	if id == "" {
+		id = uuid.New().String()
+	}
+
+	_, err := db.Exec("INSERT INTO users (id, name, email) VALUES (?, ?, ?)", id, name, email)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create user")
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	return c.JSON(http.StatusCreated, map[string]string{"id": id, "name": name, "email": email})
 }

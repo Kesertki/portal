@@ -19,10 +19,10 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
 - [x] [Reminders API](#reminders-api)
 - [x] [Chats API](#chats-api)
+- [x] [Files API](#files-api)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
-- [ ] File System API
 - [ ] Plugins API
 
 ## Running from Source
@@ -215,14 +215,14 @@ curl -X GET "http://localhost:1323/api/reminders.list"
     "id": "71f4491c-417e-4fe0-aa06-5722b942e273",
     "message": "Buy milk",
     "description": "Buy 2% milk",
-    "due_date": "2025-03-18T21:08:28-04:00",
+    "due_time": "2025-03-18T21:08:28-04:00",
     "completed": false
   },
   {
     "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
     "title": "Call mom",
     "description": "Call mom on her birthday",
-    "due_date": "2025-03-18T21:08:28-04:00",
+    "due_time": "2025-03-18T21:08:28-04:00",
     "completed": false
   }
 ]
@@ -236,16 +236,19 @@ Request body:
 
 - `message`: The reminder message
 - `description`: The reminder description
-- `due_date`: The due date and time in RFC3339 format
-- `completed`: Boolean, whether the reminder is completed
-- `webhook_url`: The URL of the webhook receiver
+- `due_time`: The due date and time in RFC3339 format
+- `webhook_url`: The URL of the webhook receiver (optional)
 
 Example:
 
 ```shell
 curl -X POST "http://localhost:1323/api/reminders.add" \
   -H "Content-Type: application/json" \
-  -d "{\"message\":\"Buy milk\",\"description\":\"Buy 2% milk\",\"due_date\":\"2025-03-18T21:08:28-04:00\",\"completed\":false}"
+  -d '{
+      "message": "Buy milk",
+      "description": "Buy 2% milk",
+      "due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'"
+    }'
 ```
 
 The returned reminder object:
@@ -255,14 +258,14 @@ The returned reminder object:
   "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
   "message": "Buy milk",
   "description": "Buy 2% milk",
-  "due_date": "2025-03-18T21:08:28-04:00",
+  "due_time": "2025-03-18T21:08:28-04:00",
   "completed": false,
   "webhook_url": "<webhook_url>"
 }
 ```
 
 The Reminders Agent has a built-in scheduler with precision up to the minute.
-It uses the `due_date` field to schedule the reminder.
+It uses the `due_time` field to schedule the reminder.
 
 #### POST /reminders.complete
 
@@ -311,7 +314,7 @@ curl -X GET "http://localhost:1323/api/reminders.info?id=09d27d7f-27ff-4e01-9598
   "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
   "message": "Buy milk",
   "description": "Buy 2% milk",
-  "due_date": "2025-03-18T21:08:28-04:00",
+  "due_time": "2025-03-18T21:08:28-04:00",
   "completed": false
 }
 ```
@@ -326,8 +329,13 @@ Example of creating a new reminder with a webhook, running 2 minutes from now:
 
 ```shell
 curl -X POST http://localhost:1323/api/reminders.add \
--H "Content-Type: application/json" \
--d '{"message":"Test reminder","description":"This is a test reminder","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'","completed":false,"webhook_url":"http://your-webhook-receiver/webhook"}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Test reminder",
+    "description":"This is a test reminder",
+    "due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'",
+    "webhook_url":"http://your-webhook-receiver/webhook"
+  }'
 ```
 
 ### Chats API
@@ -574,6 +582,113 @@ curl -X GET "http://localhost:1323/api/messages.list?chat_id=d6924d7f-e53d-452e-
     "content": "Hello, world!",
     "timestamp": 1742551200,
   }
+]
+```
+
+### Files API
+
+The Files API provides a simple way to upload and download files.
+
+- [POST /fs/files](#post-fsfiles)
+- [GET /fs/files/*](#get-fsfiles)
+- [PUT /fs/files/*](#put-fsfiles)
+- [DELETE /fs/files/*](#delete-fsfiles)
+- [GET /list/*](#get-list)
+
+#### POST /fs/files
+
+Uploads a file.
+
+Request body:
+
+- `file`: The file to upload
+- `user_id`: The user ID
+- `path`: The path to save the file
+
+Example:
+
+```shell
+curl -X POST http://localhost:1323/api/fs/files \
+     -F "file=@./data/fs/README.md" \
+     -F "user_id=123e4567-e89b-12d3-a456-426614174000" \
+     -F "path=/user/files"
+```
+
+#### GET /fs/files/*
+
+Downloads a file.
+
+Everything after `/files/` is treated as the file path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+# View the file content
+curl -X GET "http://localhost:1323/api/fs/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000"
+
+# Save the file to disk
+curl -X GET "http://localhost:1323/api/fs/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000" \
+    --output data/file.md
+```
+
+#### PUT /fs/files/*
+
+Updates a file.
+
+Everything after `/files/` is treated as the file path.
+
+Request body:
+
+- `file`: The file to upload
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X PUT "http://localhost:1323/api/fs/files/user/files/README.md" \
+     -F "file=@./data/fs/Updated.md" \
+     -F "user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+#### DELETE /fs/files/*
+
+Deletes a file.
+
+Everything after `/files/` is treated as the file path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X DELETE "http://localhost:1323/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+#### GET /list/*
+
+Lists files in a directory.
+
+Everything after `/files/` is treated as the directory path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/fs/list/user/files?user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+```json
+[
+  "README.md"
 ]
 ```
 
