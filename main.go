@@ -43,6 +43,13 @@ func main() {
 	// Log environment variables
 	log.Info().Msgf("DATA_PATH: %s", os.Getenv("DATA_PATH"))
 
+	// Initialize database
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to open database")
+	}
+	defer db.Close()
+
 	e := echo.New()
 
 	// CORS configuration to allow all origins
@@ -71,31 +78,18 @@ func main() {
 
 	e.Static("/", "public")
 
+	apiGroup := e.Group("/api")
+	// apiGroup.GET("/version", handlers.GetVersion)
+
 	e.GET("/api/reminders.list", handlers.GetReminders)
 	e.POST("/api/reminders.add", handlers.CreateReminder)
 	e.POST("/api/reminders.complete", handlers.CompleteReminder)
 	e.POST("/api/reminders.delete", handlers.DeleteReminder)
 	e.GET("/api/reminders.info", handlers.GetReminderInfo)
 
-	e.POST("/api/chats.add", handlers.CreateChat)
-	e.POST("/api/chats.delete", handlers.DeleteChat)
-	e.POST("/api/chats.rename", handlers.RenameChat)
-	e.GET("/api/chats.list", handlers.GetChats)
-	e.POST("/api/chats.pin", handlers.PinChat)
-	e.POST("/api/chats.unpin", handlers.UnpinChat)
-	e.GET("/api/chats.info", handlers.GetChatInfo)
-	e.POST("/api/messages.add", handlers.CreateChatMessage)
-	e.GET("/api/messages.list", handlers.GetChatMessages)
-
-	// Initialize database (temporary)
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		e.Logger.Fatal(err)
-	}
-	defer db.Close()
-
 	e.POST("/api/users.add", func(c echo.Context) error { return createUser(c, db) })
 
+	handlers.SetupChatApiHandlers(apiGroup, db)
 	handlers.SetupFileSystemApiHandlers(e, "/api/fs", db)
 
 	// Start WebSocket handler
