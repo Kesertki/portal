@@ -19,10 +19,10 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [DuckDuckGo Instant Answers API](#duckduckgo-instant-answers-api)
 - [x] [Reminders API](#reminders-api)
 - [x] [Chats API](#chats-api)
+- [x] [Files API](#files-api)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
-- [ ] File System API
 - [ ] Plugins API
 
 ## Running from Source
@@ -582,6 +582,113 @@ curl -X GET "http://localhost:1323/api/messages.list?chat_id=d6924d7f-e53d-452e-
     "content": "Hello, world!",
     "timestamp": 1742551200,
   }
+]
+```
+
+### Files API
+
+The Files API provides a simple way to upload and download files.
+
+- [POST /fs/files](#post-fsfiles)
+- [GET /fs/files/*](#get-fsfiles)
+- [PUT /fs/files/*](#put-fsfiles)
+- [DELETE /fs/files/*](#delete-fsfiles)
+- [GET /list/*](#get-list)
+
+#### POST /fs/files
+
+Uploads a file.
+
+Request body:
+
+- `file`: The file to upload
+- `user_id`: The user ID
+- `path`: The path to save the file
+
+Example:
+
+```shell
+curl -X POST http://localhost:1323/api/fs/files \
+     -F "file=@./data/fs/README.md" \
+     -F "user_id=123e4567-e89b-12d3-a456-426614174000" \
+     -F "path=/user/files"
+```
+
+#### GET /fs/files/*
+
+Downloads a file.
+
+Everything after `/files/` is treated as the file path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+# View the file content
+curl -X GET "http://localhost:1323/api/fs/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000"
+
+# Save the file to disk
+curl -X GET "http://localhost:1323/api/fs/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000" \
+    --output data/file.md
+```
+
+#### PUT /fs/files/*
+
+Updates a file.
+
+Everything after `/files/` is treated as the file path.
+
+Request body:
+
+- `file`: The file to upload
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X PUT "http://localhost:1323/api/fs/files/user/files/README.md" \
+     -F "file=@./data/fs/Updated.md" \
+     -F "user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+#### DELETE /fs/files/*
+
+Deletes a file.
+
+Everything after `/files/` is treated as the file path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X DELETE "http://localhost:1323/files/user/files/README.md?user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+#### GET /list/*
+
+Lists files in a directory.
+
+Everything after `/files/` is treated as the directory path.
+
+Query parameters:
+
+- `user_id`: The user ID
+
+Example:
+
+```shell
+curl -X GET "http://localhost:1323/api/fs/list/user/files?user_id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+```json
+[
+  "README.md"
 ]
 ```
 
