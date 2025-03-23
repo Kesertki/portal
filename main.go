@@ -1,9 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -11,7 +15,6 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/afero"
 
 	"github.com/Kesertki/portal/internal/handlers"
 	"github.com/Kesertki/portal/internal/storage"
@@ -22,6 +25,8 @@ var (
 	BuildDate = "unknown"
 	GitCommit = "unknown"
 )
+
+const dbPath = "./data/portal.db"
 
 func main() {
 	fmt.Printf("%s v%s (Commit: %s, Built: %s)\n", "[portal]", Version, GitCommit, BuildDate)
@@ -84,50 +89,20 @@ func main() {
 	e.POST("/api/messages.add", handlers.CreateChatMessage)
 	e.GET("/api/messages.list", handlers.GetChatMessages)
 
-	log.Info().Msg("Starting File System API")
-	// baseFs := afero.NewOsFs()
-	// fs := afero.NewBasePathFs(baseFs, "data/fs")
-	// fs := afero.NewMemMapFs()
-
-	// Create the base filesystem (read-only)
-	baseFs := afero.NewOsFs()
-	roBase := afero.NewReadOnlyFs(baseFs)
-
-	// Create the writable overlay filesystem
-	overlayFs := afero.NewMemMapFs()
-
-	// Combine them using CopyOnWriteFs
-	ufs := afero.NewCopyOnWriteFs(roBase, overlayFs)
-
-	// Create a new base path filesystem
-	fs := afero.NewBasePathFs(ufs, "data/fs")
-
-	httpFs := afero.NewHttpFs(fs)
-	fileServer := http.FileServer(httpFs.Dir(""))
-	e.GET("/api/fs/*", echo.WrapHandler(http.StripPrefix("/api/fs/", fileServer)))
-
-	// Create test files and directories
-	err = fs.MkdirAll("src/a", 0755)
+	// Initialize database (temporary)
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create directory")
+		e.Logger.Fatal(err)
 	}
-	err = afero.WriteFile(fs, "src/a/b", []byte("file b"), 0644)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to write file")
-	}
-	err = afero.WriteFile(fs, "src/c", []byte("file c"), 0644)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to write file")
-	}
+	defer db.Close()
 
-	afero.Walk(fs, "", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			e.Logger.Error(err)
-			return nil
-		}
-		log.Info().Msgf("File: %s", path)
-		return nil
-	})
+	// File System API
+	e.POST("/users", func(c echo.Context) error { return createUser(c, db) })
+	e.POST("/files", func(c echo.Context) error { return createFile(c, db) })
+	e.GET("/files/*", func(c echo.Context) error { return readFile(c, db) })
+	e.PUT("/files/*", func(c echo.Context) error { return updateFile(c, db) })
+	e.DELETE("/files/*", func(c echo.Context) error { return deleteFile(c, db) })
+	e.GET("/list/*", func(c echo.Context) error { return listDirectory(c, db) })
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
@@ -139,4 +114,206 @@ func main() {
 	go handlers.StartRemindersAgent(wsHandler)
 
 	e.Logger.Fatal(e.Start(":1323"))
+}
+
+// FS API prototype
+
+// Create a new user
+func createUser(c echo.Context, db *sql.DB) error {
+	username := c.FormValue("username")
+	_, err := db.Exec("INSERT INTO users (username) VALUES (?)", username)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	return c.String(http.StatusOK, "User created successfully")
+}
+
+// Create a new file
+func createFile(c echo.Context, db *sql.DB) error {
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.String(http.StatusBadRequest, "Bad Request")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	defer src.Close()
+
+	userID := c.FormValue("user_id")
+	filePath := filepath.Join(c.FormValue("path"), file.Filename)
+	fileSize := file.Size
+
+	// Insert file metadata
+	res, err := db.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	fileID, err := res.LastInsertId()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	// Insert file content in chunks
+	chunkSize := 1024 * 1024 // 1MB chunks
+	chunkIndex := 0
+	buffer := make([]byte, chunkSize)
+
+	for {
+		n, err := src.Read(buffer)
+		if err != nil && err != io.EOF {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		if n == 0 {
+			break
+		}
+
+		_, err = db.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		chunkIndex++
+	}
+
+	return c.String(http.StatusOK, "File created successfully")
+}
+
+// Read a file
+func readFile(c echo.Context, db *sql.DB) error {
+	userID := c.QueryParam("user_id")
+	filePath := c.Param("*")
+	var fileID int64
+	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
+	if err != nil {
+		return c.String(http.StatusNotFound, "File not found")
+	}
+
+	rows, err := db.Query("SELECT content FROM file_content WHERE file_id = ? ORDER BY chunk_index", fileID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	defer rows.Close()
+
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEOctetStream)
+	for rows.Next() {
+		var chunk []byte
+		if err := rows.Scan(&chunk); err != nil {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		if _, err := c.Response().Write(chunk); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Update a file
+func updateFile(c echo.Context, db *sql.DB) error {
+	userID := c.FormValue("user_id")
+	filePath := c.Param("*")
+	file, err := c.FormFile("file")
+	if err != nil {
+		return c.String(http.StatusBadRequest, "Bad Request")
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	defer src.Close()
+
+	var fileID int64
+	err = db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
+	if err != nil {
+		return c.String(http.StatusNotFound, "File not found")
+	}
+
+	// Delete existing content
+	_, err = db.Exec("DELETE FROM file_content WHERE file_id = ?", fileID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	// Insert new file content in chunks
+	chunkSize := 1024 * 1024 // 1MB chunks
+	chunkIndex := 0
+	buffer := make([]byte, chunkSize)
+
+	for {
+		n, err := src.Read(buffer)
+		if err != nil && err != io.EOF {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		if n == 0 {
+			break
+		}
+
+		_, err = db.Exec("INSERT INTO file_content (file_id, chunk_index, content) VALUES (?, ?, ?)", fileID, chunkIndex, buffer[:n])
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		chunkIndex++
+	}
+
+	// Update file metadata
+	_, err = db.Exec("UPDATE files SET size = ?, created_at = ? WHERE id = ?", file.Size, time.Now(), fileID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	return c.String(http.StatusOK, "File updated successfully")
+}
+
+// Delete a file
+func deleteFile(c echo.Context, db *sql.DB) error {
+	userID := c.QueryParam("user_id")
+	filePath := c.Param("*")
+	var fileID int64
+	err := db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
+	if err != nil {
+		return c.String(http.StatusNotFound, "File not found")
+	}
+
+	_, err = db.Exec("DELETE FROM file_content WHERE file_id = ?", fileID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	_, err = db.Exec("DELETE FROM files WHERE id = ?", fileID)
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+
+	return c.String(http.StatusOK, "File deleted successfully")
+}
+
+// List directory contents
+func listDirectory(c echo.Context, db *sql.DB) error {
+	userID := c.QueryParam("user_id")
+	dirPath := c.Param("*")
+
+	// Ensure the path ends with a slash to denote a directory
+	if !strings.HasSuffix(dirPath, "/") {
+		dirPath += "/"
+	}
+
+	rows, err := db.Query("SELECT filename FROM files WHERE user_id = ? AND path LIKE ?", userID, dirPath+"%")
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Internal Server Error")
+	}
+	defer rows.Close()
+
+	var files []string
+	for rows.Next() {
+		var filename string
+		if err := rows.Scan(&filename); err != nil {
+			return c.String(http.StatusInternalServerError, "Internal Server Error")
+		}
+		files = append(files, filename)
+	}
+
+	return c.JSON(http.StatusOK, files)
 }
