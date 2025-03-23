@@ -237,15 +237,18 @@ Request body:
 - `message`: The reminder message
 - `description`: The reminder description
 - `due_time`: The due date and time in RFC3339 format
-- `completed`: Boolean, whether the reminder is completed
-- `webhook_url`: The URL of the webhook receiver
+- `webhook_url`: The URL of the webhook receiver (optional)
 
 Example:
 
 ```shell
 curl -X POST "http://localhost:1323/api/reminders.add" \
--H "Content-Type: application/json" \
--d '{"message":"Buy milk","description":"Buy 2% milk","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'"}'
+  -H "Content-Type: application/json" \
+  -d '{
+      "message": "Buy milk",
+      "description": "Buy 2% milk",
+      "due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'"
+    }'
 ```
 
 The returned reminder object:
@@ -326,8 +329,13 @@ Example of creating a new reminder with a webhook, running 2 minutes from now:
 
 ```shell
 curl -X POST http://localhost:1323/api/reminders.add \
--H "Content-Type: application/json" \
--d '{"message":"Test reminder","description":"This is a test reminder","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'","completed":false,"webhook_url":"http://your-webhook-receiver/webhook"}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Test reminder",
+    "description":"This is a test reminder",
+    "due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'",
+    "webhook_url":"http://your-webhook-receiver/webhook"
+  }'
 ```
 
 ### Chats API
