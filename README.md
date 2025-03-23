@@ -215,14 +215,14 @@ curl -X GET "http://localhost:1323/api/reminders.list"
     "id": "71f4491c-417e-4fe0-aa06-5722b942e273",
     "message": "Buy milk",
     "description": "Buy 2% milk",
-    "due_date": "2025-03-18T21:08:28-04:00",
+    "due_time": "2025-03-18T21:08:28-04:00",
     "completed": false
   },
   {
     "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
     "title": "Call mom",
     "description": "Call mom on her birthday",
-    "due_date": "2025-03-18T21:08:28-04:00",
+    "due_time": "2025-03-18T21:08:28-04:00",
     "completed": false
   }
 ]
@@ -236,7 +236,7 @@ Request body:
 
 - `message`: The reminder message
 - `description`: The reminder description
-- `due_date`: The due date and time in RFC3339 format
+- `due_time`: The due date and time in RFC3339 format
 - `completed`: Boolean, whether the reminder is completed
 - `webhook_url`: The URL of the webhook receiver
 
@@ -244,8 +244,8 @@ Example:
 
 ```shell
 curl -X POST "http://localhost:1323/api/reminders.add" \
-  -H "Content-Type: application/json" \
-  -d "{\"message\":\"Buy milk\",\"description\":\"Buy 2% milk\",\"due_date\":\"2025-03-18T21:08:28-04:00\",\"completed\":false}"
+-H "Content-Type: application/json" \
+-d '{"message":"Buy milk","description":"Buy 2% milk","due_time":"'"$(date -v +2M +"%Y-%m-%dT%H:%M:%SZ")"'"}'
 ```
 
 The returned reminder object:
@@ -255,14 +255,14 @@ The returned reminder object:
   "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
   "message": "Buy milk",
   "description": "Buy 2% milk",
-  "due_date": "2025-03-18T21:08:28-04:00",
+  "due_time": "2025-03-18T21:08:28-04:00",
   "completed": false,
   "webhook_url": "<webhook_url>"
 }
 ```
 
 The Reminders Agent has a built-in scheduler with precision up to the minute.
-It uses the `due_date` field to schedule the reminder.
+It uses the `due_time` field to schedule the reminder.
 
 #### POST /reminders.complete
 
@@ -311,7 +311,7 @@ curl -X GET "http://localhost:1323/api/reminders.info?id=09d27d7f-27ff-4e01-9598
   "id": "09d27d7f-27ff-4e01-9598-104b3d654675",
   "message": "Buy milk",
   "description": "Buy 2% milk",
-  "due_date": "2025-03-18T21:08:28-04:00",
+  "due_time": "2025-03-18T21:08:28-04:00",
   "completed": false
 }
 ```

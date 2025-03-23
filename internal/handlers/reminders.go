@@ -132,7 +132,6 @@ func notifyWebhook(reminder Reminder, webhookURL string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Error().Msgf("Failed to send webhook: %s", resp.Status)
 		return fmt.Errorf("failed to send webhook: %s", resp.Status)
 	}
 
