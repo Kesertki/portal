@@ -163,7 +163,9 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 			truncatedNow.Add(time.Minute).Format("2006-01-02 15:04:05"))
 		if err != nil {
 			log.Error().Err(err).Msg("Error querying reminders")
-			tx.Rollback()
+			if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
+				log.Error().Err(rErr).Msg("Failed to rollback transaction")
+			}
 			continue
 		}
 
@@ -171,7 +173,9 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 			var r Reminder
 			if err := rows.Scan(&r.ID, &r.Message, &r.WebhookURL); err != nil {
 				log.Error().Err(err).Msg("Error scanning reminder")
-				tx.Rollback()
+				if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
+					log.Error().Err(rErr).Msg("Failed to rollback transaction")
+				}
 				continue
 			}
 			log.Info().Msgf("Reminder %s: %s", r.ID, r.Message)
@@ -189,7 +193,9 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 
 			if _, err := tx.Exec("UPDATE reminders SET completed = TRUE WHERE id = ?", r.ID); err != nil {
 				log.Error().Err(err).Msg("Error marking reminder as completed")
-				tx.Rollback()
+				if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
+					log.Error().Err(rErr).Msg("Failed to rollback transaction")
+				}
 				continue
 			}
 		}

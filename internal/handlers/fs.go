@@ -42,7 +42,11 @@ func CreateFileHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to start transaction")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer tx.Rollback()
+		defer func() {
+			if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
+				log.Error().Err(rErr).Msg("Failed to rollback transaction")
+			}
+		}()
 
 		res, err := tx.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
 		if err != nil {

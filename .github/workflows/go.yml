@@ -24,6 +24,11 @@ jobs:
     - name: Install dependencies
       run: go get .
 
+    - name: Lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.64
+
     - name: Build
       run: go build -v ./...
 
