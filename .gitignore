@@ -8,7 +8,6 @@
 
 # Dependencies
 /vendor/
-go.sum
 
 # IDE and Editor files
 .vscode/
