@@ -62,6 +62,16 @@ To run the server binary:
 
 ## Docker
 
+The server can be run in a Docker container. The Docker image is available on Docker Hub.
+
+To pull the Docker image:
+
+```shell
+docker pull kesertki/portal
+```
+
+### Building and Running Docker Container
+
 To build and run the Docker container:
 
 ```shell
@@ -80,12 +90,31 @@ PORTAL_GEO_LOCATION_ENABLED=true
 PORTAL_CLIENT_IP=1.1.1.1
 ```
 
-### Running Docker Compose
+### Running with Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  api:
+    container_name: api
+    image: kesertki/portal:latest
+    ports:
+      - "1323:1323"
+    # environment:
+    #   PORTAL_GEO_LOCATION_ENABLED: true
+    #   PORTAL_CLIENT_IP: "1.1.1.1"
+    env_file:
+      - .env.prod
+    volumes:
+      - ./data:/root/data
+```
 
 To run the Docker container with Docker Compose:
 
 ```shell
-docker-compose up --build
+docker-compose up -d
 ```
 
 ## API
