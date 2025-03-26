@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS buckets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS objects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    data BLOB NOT NULL,
+    content_type TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bucket_id) REFERENCES buckets(id),
+    UNIQUE(bucket_id, key)
+);

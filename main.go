@@ -87,6 +87,15 @@ func main() {
 	handlers.SetupChatApiHandlers(apiGroup, db)
 	handlers.SetupFileSystemApiHandlers(apiGroup, db)
 
+	// Storage API
+	api := handlers.NewAPI(db)
+
+	e.POST("/buckets/:bucket", api.CreateBucket)
+	e.POST("/buckets/:bucket/objects/:key", api.UploadObject)
+	e.GET("/buckets/:bucket/objects/:key", api.GetObject)
+	e.GET("/buckets/:bucket/objects", api.ListObjects)
+	e.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
+
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
 	wsHandler := handlers.NewWebSocketHandler()
