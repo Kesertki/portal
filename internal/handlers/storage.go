@@ -26,7 +26,10 @@ func NewAPI(db *sql.DB) *API {
 func (a *API) ListBuckets(c echo.Context) error {
 	rows, err := a.db.Query("SELECT name, created_at FROM buckets")
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to retrieve buckets"})
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to retrieve buckets",
+		})
 	}
 	defer rows.Close()
 
@@ -40,7 +43,10 @@ func (a *API) ListBuckets(c echo.Context) error {
 		var name string
 		var creationDate string
 		if err := rows.Scan(&name, &creationDate); err != nil {
-			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to scan bucket data"})
+			return c.XML(http.StatusInternalServerError, ErrorResponse{
+				Code:    "InternalError",
+				Message: "Failed to scan bucket data",
+			})
 		}
 		buckets = append(buckets, Bucket{Name: name, CreationDate: creationDate})
 	}
@@ -354,12 +360,24 @@ func (a *API) DeleteObject(c echo.Context) error {
 	var bucketID int
 	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucket).Scan(&bucketID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
+		if err == sql.ErrNoRows {
+			return c.XML(http.StatusNotFound, ErrorResponse{
+				Code:    "NoSuchBucket",
+				Message: "The specified bucket does not exist",
+			})
+		}
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to retrieve bucket information",
+		})
 	}
 
 	_, err = a.db.Exec("DELETE FROM objects WHERE bucket_id = ? AND key = ?", bucketID, key)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete object"})
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to delete object",
+		})
 	}
 
 	// Return a 204 No Content response to indicate successful deletion
@@ -377,12 +395,24 @@ func (a *API) InitiateMultipartUpload(c echo.Context) error {
 	var bucketID int
 	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucket).Scan(&bucketID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
+		if err == sql.ErrNoRows {
+			return c.XML(http.StatusNotFound, ErrorResponse{
+				Code:    "NoSuchBucket",
+				Message: "The specified bucket does not exist",
+			})
+		}
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to retrieve bucket information",
+		})
 	}
 
 	_, err = a.db.Exec("INSERT INTO multipart_uploads (bucket_id, key, upload_id) VALUES (?, ?, ?)", bucketID, key, uploadID)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to initiate multipart upload"})
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to initiate multipart upload",
+		})
 	}
 
 	return c.XML(http.StatusOK, struct {
