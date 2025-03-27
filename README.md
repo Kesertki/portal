@@ -20,6 +20,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [Reminders API](#reminders-api)
 - [x] [Chats API](#chats-api)
 - [x] [Files API](#files-api)
+- [x] [Storage API (S3 compatible)](#storage-api-s3-compatible)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
@@ -720,6 +721,29 @@ curl -X GET "http://localhost:1323/api/fs/list/user/files?user_id=123e4567-e89b-
   "README.md"
 ]
 ```
+
+### Storage API (S3 compatible)
+
+Provides a simple S3-compatible storage API for uploading and downloading files. Basic compatibility with `s3cmd` and other S3 clients.
+
+> All api endpoints are prefixed with `/api/storage`.
+
+- [GET /](#get-api-storage) - List all buckets (`s3cmd` compatibility)
+- [GET /:bucket](#get-apistoragebucket) - List all objects in a bucket (`s3cmd` compatibility)
+- [GET /buckets](#get-apistoragebuckets) - List all buckets
+- [POST /buckets/:bucket](#post-apistoragebucketsbucket) - Create a new bucket
+- [POST /buckets/:bucket/objects/:key](#post-apistoragebucketsbucketobjectskey) - Upload a new object
+- [PUT /buckets/:bucket/objects/:key](#put-apistoragebucketsbucketobjectskey) - Upload a part of the multipart object
+- [GET /buckets/:bucket/objects/:key](#get-apistoragebucketsbucketobjectskey) - Download an object
+- [HEAD /buckets/:bucket/objects/:key](#head-apistoragebucketsbucketobjectskey) - Get object metadata (`s3cmd` compatibility)
+- [GET /buckets/:bucket/objects](#get-apistoragebucketsbucketobjects) - List all objects in a bucket
+- [DELETE /buckets/:bucket/objects/:key](#delete-apistoragebucketsbucketobjectskey) - Delete an object
+- [POST /buckets/:bucket/objects/:key/complete](#post-apistoragebucketsbucketobjectskeycomplete) - Complete the multipart upload
+- [GET /:bucket/:key](#get-apistoragebucketkey) - Download an object (`s3cmd` compatibility)
+- [HEAD /:bucket/:key](#head-apistoragebucketkey) - Get object metadata (`s3cmd` compatibility)
+- [DELETE /:bucket/:key](#delete-apistoragebucketkey) - Delete an object (`s3cmd` compatibility)
+
+
 
 ## WebSockets
 
