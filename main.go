@@ -60,8 +60,7 @@ func main() {
 	}))
 
 	// Middleware
-	// e.Use(middleware.Logger())
-	// Custom logger middleware for Common Log Format (CLF)
+	e.Pre(middleware.RemoveTrailingSlash())
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "${remote_ip} - - [${time_rfc3339}] \"${method} ${uri} ${protocol}\" ${status} ${bytes_out}\n",
 		Output: os.Stderr,

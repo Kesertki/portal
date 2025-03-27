@@ -140,44 +140,71 @@ func (a *API) GetObject(c echo.Context) error {
 }
 
 func (a *API) ListObjects(c echo.Context) error {
-	bucketName := c.Param("bucketName")
+	bucketName := c.Param("bucket")
+	delimiter := c.QueryParam("delimiter")
 
 	// Get bucket ID from name
 	var bucketID int
 	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucketName).Scan(&bucketID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
+		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message></Error>`)
 	}
 
 	// Query objects for the given bucket
-	rows, err := a.db.Query("SELECT key FROM objects WHERE bucket_id = ?", bucketID)
+	query := "SELECT key, created_at, LENGTH(data) as size FROM objects WHERE bucket_id = ?"
+	args := []interface{}{bucketID}
+
+	if delimiter != "" {
+		query += " AND key LIKE ?"
+		args = append(args, delimiter+"%")
+	}
+
+	rows, err := a.db.Query(query, args...)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to retrieve objects"})
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to retrieve objects</Message></Error>`)
 	}
 	defer rows.Close()
 
 	type Object struct {
-		Key string `xml:"Key"`
+		Key          string `xml:"Key"`
+		LastModified string `xml:"LastModified"`
+		ETag         string `xml:"ETag"`
+		Size         int64  `xml:"Size"`
+		StorageClass string `xml:"StorageClass"`
 	}
 
 	var objects []Object
 	for rows.Next() {
 		var key string
-		if err := rows.Scan(&key); err != nil {
-			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to scan object key"})
+		var createdAt string
+		var size int64
+		if err := rows.Scan(&key, &createdAt, &size); err != nil {
+			return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to scan object data</Message></Error>`)
 		}
-		objects = append(objects, Object{Key: key})
+		// For simplicity, using a dummy ETag and StorageClass
+		etag := "dummy-etag" // Replace with actual ETag calculation if available
+		storageClass := "STANDARD"
+		objects = append(objects, Object{Key: key, LastModified: createdAt, ETag: etag, Size: size, StorageClass: storageClass})
 	}
 
-	type ListObjectsResult struct {
-		XMLName xml.Name `xml:"ListObjectsResult"`
-		Objects struct {
-			Object []Object `xml:"Object"`
-		} `xml:"Contents"`
+	type ListBucketResult struct {
+		XMLName     xml.Name `xml:"ListBucketResult"`
+		Name        string   `xml:"Name"`
+		Prefix      string   `xml:"Prefix"`
+		Marker      string   `xml:"Marker"`
+		MaxKeys     int      `xml:"MaxKeys"`
+		IsTruncated bool     `xml:"IsTruncated"`
+		Contents    []Object `xml:"Contents"`
 	}
 
-	response := ListObjectsResult{}
-	response.Objects.Object = objects
+	response := ListBucketResult{
+		Name:        bucketName,
+		Prefix:      "",
+		Marker:      "",
+		MaxKeys:     1000,
+		IsTruncated: false,
+		Contents:    objects,
+	}
 
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
 	return c.XML(http.StatusOK, response)
