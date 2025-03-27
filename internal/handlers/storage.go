@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -154,11 +155,6 @@ func (a *API) ListObjects(c echo.Context) error {
 	query := "SELECT key, created_at, LENGTH(data) as size FROM objects WHERE bucket_id = ?"
 	args := []interface{}{bucketID}
 
-	if delimiter != "" {
-		query += " AND key LIKE ?"
-		args = append(args, delimiter+"%")
-	}
-
 	rows, err := a.db.Query(query, args...)
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to retrieve objects</Message></Error>`)
@@ -174,6 +170,7 @@ func (a *API) ListObjects(c echo.Context) error {
 	}
 
 	var objects []Object
+	var commonPrefixes []string
 	for rows.Next() {
 		var key string
 		var createdAt string
@@ -181,6 +178,19 @@ func (a *API) ListObjects(c echo.Context) error {
 		if err := rows.Scan(&key, &createdAt, &size); err != nil {
 			return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to scan object data</Message></Error>`)
 		}
+
+		if delimiter != "" {
+			// Check if the key contains the delimiter and add the prefix
+			if strings.Contains(key, delimiter) {
+				prefix := key[:strings.Index(key, delimiter)+len(delimiter)]
+				if !contains(commonPrefixes, prefix) {
+					commonPrefixes = append(commonPrefixes, prefix)
+				}
+				// Skip adding the object itself if it matches the delimiter
+				continue
+			}
+		}
+
 		// For simplicity, using a dummy ETag and StorageClass
 		etag := "dummy-etag" // Replace with actual ETag calculation if available
 		storageClass := "STANDARD"
@@ -188,26 +198,38 @@ func (a *API) ListObjects(c echo.Context) error {
 	}
 
 	type ListBucketResult struct {
-		XMLName     xml.Name `xml:"ListBucketResult"`
-		Name        string   `xml:"Name"`
-		Prefix      string   `xml:"Prefix"`
-		Marker      string   `xml:"Marker"`
-		MaxKeys     int      `xml:"MaxKeys"`
-		IsTruncated bool     `xml:"IsTruncated"`
-		Contents    []Object `xml:"Contents"`
+		XMLName        xml.Name `xml:"ListBucketResult"`
+		Name           string   `xml:"Name"`
+		Prefix         string   `xml:"Prefix"`
+		Marker         string   `xml:"Marker"`
+		MaxKeys        int      `xml:"MaxKeys"`
+		IsTruncated    bool     `xml:"IsTruncated"`
+		Contents       []Object `xml:"Contents"`
+		CommonPrefixes []string `xml:"CommonPrefixes>Prefix"`
 	}
 
 	response := ListBucketResult{
-		Name:        bucketName,
-		Prefix:      "",
-		Marker:      "",
-		MaxKeys:     1000,
-		IsTruncated: false,
-		Contents:    objects,
+		Name:           bucketName,
+		Prefix:         "",
+		Marker:         "",
+		MaxKeys:        1000,
+		IsTruncated:    false,
+		Contents:       objects,
+		CommonPrefixes: commonPrefixes,
 	}
 
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
 	return c.XML(http.StatusOK, response)
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *API) DeleteObject(c echo.Context) error {

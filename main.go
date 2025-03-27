@@ -91,7 +91,8 @@ func main() {
 	// storageApi := apiGroup.Group("/storage")
 	storageApi := e
 
-	storageApi.GET("", api.ListBuckets)
+	storageApi.GET("", api.ListBuckets)         // s3cmd compatibility
+	storageApi.GET("/:bucket", api.ListObjects) // s3cmd compatibility
 	storageApi.GET("/buckets", api.ListBuckets)
 	storageApi.POST("/buckets/:bucket", api.CreateBucket)
 	storageApi.POST("/buckets/:bucket/objects/:key", api.UploadObject)
