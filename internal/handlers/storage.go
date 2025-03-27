@@ -59,6 +59,17 @@ func (a *API) ListBuckets(c echo.Context) error {
 	return c.XML(http.StatusOK, response)
 }
 
+type CreateBucketResponse struct {
+	XMLName xml.Name `xml:"CreateBucketResponse"`
+	Message string   `xml:"Message"`
+}
+
+type ErrorResponse struct {
+	XMLName xml.Name `xml:"Error"`
+	Code    string   `xml:"Code"`
+	Message string   `xml:"Message"`
+}
+
 func (a *API) CreateBucket(c echo.Context) error {
 	bucketName := c.Param("bucket")
 
@@ -66,12 +77,20 @@ func (a *API) CreateBucket(c echo.Context) error {
 	_, err := a.db.Exec("INSERT INTO buckets (name) VALUES (?)", bucketName)
 	if err != nil {
 		if strings.Contains(err.Error(), "Duplicate entry") {
-			return c.XML(http.StatusConflict, `<Error><Code>BucketAlreadyExists</Code><Message>The requested bucket name is not available</Message></Error>`)
+			return c.XML(http.StatusConflict, ErrorResponse{
+				Code:    "BucketAlreadyExists",
+				Message: "The requested bucket name is not available",
+			})
 		}
-		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to create bucket</Message></Error>`)
+		return c.XML(http.StatusInternalServerError, ErrorResponse{
+			Code:    "InternalError",
+			Message: "Failed to create bucket",
+		})
 	}
 
-	response := `<CreateBucketResponse><Message>Bucket created successfully</Message></CreateBucketResponse>`
+	response := CreateBucketResponse{
+		Message: "Bucket created successfully",
+	}
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
 	return c.XML(http.StatusCreated, response)
 }
@@ -508,6 +527,19 @@ func (a *API) AbortMultipartUpload(c echo.Context) error {
 	tx, err := a.db.Begin()
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to start transaction</Message></Error>`)
+	}
+
+	// Verify that the upload ID exists for the given bucket and key
+	var exists bool
+	err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM multipart_uploads WHERE upload_id = ? AND bucket_id = (SELECT id FROM buckets WHERE name = ?) AND key = ?)", uploadID, bucket, key).Scan(&exists)
+	if err != nil {
+		tx.Rollback()
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to verify upload ID</Message></Error>`)
+	}
+
+	if !exists {
+		tx.Rollback()
+		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchUpload</Code><Message>The specified multipart upload does not exist</Message></Error>`)
 	}
 
 	// Delete all parts associated with the upload ID

@@ -729,18 +729,22 @@ Provides a simple S3-compatible storage API for uploading and downloading files.
 > All api endpoints are prefixed with `/api/storage`.
 
 - `GET /` - List all buckets
-- `GET /:bucket` - List all objects in a bucket
-- `GET /buckets` - List all buckets
 - `POST /buckets/:bucket` - Create a new bucket
-- `POST /buckets/:bucket/objects/:key` - Upload a new object
-- `PUT /buckets/:bucket/objects/:key` - Upload a part of the multipart object
+- `DELETE /buckets/:bucket` - Delete a bucket
+- `PUT /buckets/:bucket/objects/:key` - Upload object
+- `POST /buckets/:bucket/objects/:key` - Initiate a multipart upload
+- `PUT /buckets/:bucket/objects/:key/uploads` - Upload a part of the multipart object
+- `POST /buckets/:bucket/objects/:key/complete` - Complete the multipart upload
+- `DELETE /buckets/:bucket/objects/:key/uploads` - Abort the multipart upload
 - `GET /buckets/:bucket/objects/:key` - Download an object
 - `HEAD /buckets/:bucket/objects/:key` - Get object metadata
 - `GET /buckets/:bucket/objects` - List all objects in a bucket
 - `DELETE /buckets/:bucket/objects/:key` - Delete an object
-- `POST /buckets/:bucket/objects/:key/complete` - Complete the multipart upload
+- `GET /:bucket` - List all objects in a bucket
+- `PUT /:bucket` - Create a new bucket
 - `GET /:bucket/:key` - Download an object
 - `HEAD /:bucket/:key` - Get object metadata
+- `DELETE /:bucket` - Delete a bucket
 - `DELETE /:bucket/:key` - Delete an object
 
 ### Using with CURL
@@ -749,18 +753,32 @@ Create a new bucket:
 
 ```shell
 curl -X POST http://localhost:1323/api/storage/buckets/mybucket
+```
 
-{"message":"Bucket created"}
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CreateBucketResponse>
+	<Message>Bucket created successfully</Message>
+</CreateBucketResponse>
 ```
 
 Upload a new object:
 
 ```shell
-curl -X POST \
-    -F "file=@README.md;type=text/markdown" \
-    http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+curl -X PUT \
+     -F "file=@README.md;type=text/markdown" \
+     http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+```
 
-{"message":"File uploaded successfully"}
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<PutObjectResult>
+	<ETag>5520927df1b08a8f5778c03b21c75d64</ETag>
+</PutObjectResult>
 ```
 
 Download an object:
