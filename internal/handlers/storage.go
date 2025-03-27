@@ -263,25 +263,29 @@ func contains(slice []string, item string) bool {
 func (a *API) DeleteObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")
-	uploadID := c.QueryParam("uploadId")
 
-	if uploadID != "" {
-		// Abort multipart upload
-		_, _ = a.db.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
-		_, _ = a.db.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
-		return c.XML(http.StatusOK, `<AbortMultipartUploadResult/>`)
+	var bucketID int
+	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucket).Scan(&bucketID)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
 	}
 
-	// Delete completed object
-	_, err := a.db.Exec(`
-		DELETE FROM objects
-		WHERE key = ? AND bucket_id = (SELECT id FROM buckets WHERE name = ?)`, key, bucket)
-
+	_, err = a.db.Exec("DELETE FROM objects WHERE bucket_id = ? AND key = ?", bucketID, key)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete object"})
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"message": "Object deleted"})
+	// Create XML response
+	type DeleteResult struct {
+		XMLName xml.Name `xml:"DeleteResult"`
+	}
+
+	response := DeleteResult{}
+
+	// Set the Content-Type header to application/xml
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+
+	return c.XML(http.StatusOK, response)
 }
 
 func (a *API) InitiateMultipartUpload(c echo.Context) error {

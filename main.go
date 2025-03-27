@@ -104,7 +104,7 @@ func main() {
 	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
 
 	// Catch-all route for S3 compatibility
-	storageApi.Match([]string{http.MethodGet, http.MethodHead}, "/:bucket/:key", api.GetObject)
+	storageApi.Match([]string{http.MethodGet, http.MethodHead, http.MethodDelete}, "/:bucket/:key", api.DeleteObject)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
