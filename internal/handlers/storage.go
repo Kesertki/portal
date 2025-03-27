@@ -140,7 +140,7 @@ func (a *API) GetObject(c echo.Context) error {
 
 	if err != nil {
 		fmt.Println("Error retrieving object:", err)
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "Object not found"})
+		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchKey</Code><Message>The specified key does not exist</Message></Error>`)
 	}
 
 	finalContentType := "application/octet-stream"
