@@ -89,14 +89,18 @@ func main() {
 
 	// Storage API
 	api := handlers.NewAPI(db)
+	// storageApi := apiGroup.Group("/storage")
+	storageApi := e
 
-	e.POST("/buckets/:bucket", api.CreateBucket)
-	e.POST("/buckets/:bucket/objects/:key", api.UploadObject)
-	e.PUT("/buckets/:bucket/objects/:key", api.UploadPart)
-	e.GET("/buckets/:bucket/objects/:key", api.GetObject)
-	e.GET("/buckets/:bucket/objects", api.ListObjects)
-	e.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
-	e.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
+	storageApi.GET("", api.ListBuckets)
+	storageApi.GET("/buckets", api.ListBuckets)
+	storageApi.POST("/buckets/:bucket", api.CreateBucket)
+	storageApi.POST("/buckets/:bucket/objects/:key", api.UploadObject)
+	storageApi.PUT("/buckets/:bucket/objects/:key", api.UploadPart)
+	storageApi.GET("/buckets/:bucket/objects/:key", api.GetObject)
+	storageApi.GET("/buckets/:bucket/objects", api.ListObjects)
+	storageApi.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
+	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")

@@ -21,6 +21,42 @@ func NewAPI(db *sql.DB) *API {
 	return &API{db: db}
 }
 
+func (a *API) ListBuckets(c echo.Context) error {
+	rows, err := a.db.Query("SELECT name, created_at FROM buckets")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to retrieve buckets"})
+	}
+	defer rows.Close()
+
+	type Bucket struct {
+		Name         string `xml:"Name"`
+		CreationDate string `xml:"CreationDate"`
+	}
+
+	var buckets []Bucket
+	for rows.Next() {
+		var name string
+		var creationDate string
+		if err := rows.Scan(&name, &creationDate); err != nil {
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to scan bucket data"})
+		}
+		buckets = append(buckets, Bucket{Name: name, CreationDate: creationDate})
+	}
+
+	type ListAllMyBucketsResult struct {
+		XMLName xml.Name `xml:"ListAllMyBucketsResult"`
+		Buckets struct {
+			Bucket []Bucket `xml:"Bucket"`
+		} `xml:"Buckets"`
+	}
+
+	response := ListAllMyBucketsResult{}
+	response.Buckets.Bucket = buckets
+
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+	return c.XML(http.StatusOK, response)
+}
+
 // Create a new bucket
 func (a *API) CreateBucket(c echo.Context) error {
 	name := c.Param("bucket")
@@ -103,29 +139,48 @@ func (a *API) GetObject(c echo.Context) error {
 	return c.Blob(http.StatusOK, contentType, data)
 }
 
-// List objects in a bucket
 func (a *API) ListObjects(c echo.Context) error {
-	bucket := c.Param("bucket")
+	bucketName := c.Param("bucketName")
 
-	rows, err := a.db.Query(`
-		SELECT o.key FROM objects o
-		JOIN buckets b ON o.bucket_id = b.id
-		WHERE b.name = ?`, bucket)
+	// Get bucket ID from name
+	var bucketID int
+	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucketName).Scan(&bucketID)
 	if err != nil {
-		return err
+		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
+	}
+
+	// Query objects for the given bucket
+	rows, err := a.db.Query("SELECT key FROM objects WHERE bucket_id = ?", bucketID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to retrieve objects"})
 	}
 	defer rows.Close()
 
-	var objects []string
+	type Object struct {
+		Key string `xml:"Key"`
+	}
+
+	var objects []Object
 	for rows.Next() {
 		var key string
 		if err := rows.Scan(&key); err != nil {
-			return err
+			return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to scan object key"})
 		}
-		objects = append(objects, key)
+		objects = append(objects, Object{Key: key})
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"objects": objects})
+	type ListObjectsResult struct {
+		XMLName xml.Name `xml:"ListObjectsResult"`
+		Objects struct {
+			Object []Object `xml:"Object"`
+		} `xml:"Contents"`
+	}
+
+	response := ListObjectsResult{}
+	response.Objects.Object = objects
+
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+	return c.XML(http.StatusOK, response)
 }
 
 func (a *API) DeleteObject(c echo.Context) error {
