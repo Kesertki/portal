@@ -73,7 +73,6 @@ func (a *API) CreateBucket(c echo.Context) error {
 func (a *API) UploadObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")
-
 	fmt.Println("Received request for:", bucket, key)
 	fmt.Println("Query Params:", c.QueryParams())
 
@@ -111,8 +110,8 @@ func (a *API) UploadObject(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
 	}
 
-	// Get the Content-Type from the request header
-	contentType := c.Request().Header.Get("Content-Type")
+	// Get the Content-Type from the multipart form data
+	contentType := file.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "application/octet-stream" // Default content type if not provided
 	}
