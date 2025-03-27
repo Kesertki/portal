@@ -818,6 +818,39 @@ use_https = False
 EOF
 ```
 
+Create a new bucket:
+
+```shell
+s3cmd -c .s3cfg mb s3://mybucket
+
+# Bucket 's3://mybucket/' created
+```
+
+List all buckets:
+
+```shell
+s3cmd -c .s3cfg ls      
+```
+
+Example output:
+
+```text
+2025-03-27 19:06  s3://mybucket
+2025-03-27 19:12  s3://mybucket1
+2025-03-27 19:18  s3://mybucket2
+2025-03-27 19:19  s3://mybucket3
+2025-03-27 19:26  s3://mybucket4
+2025-03-27 19:26  s3://mybucket5
+```
+
+Delete the bucket:
+
+```shell
+s3cmd -c .s3cfg rb s3://mybucket5
+
+## Bucket 's3://mybucket5/' removed
+```
+
 ## WebSockets
 
 The server supports WebSockets for real-time communication with clients.
