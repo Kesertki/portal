@@ -88,8 +88,8 @@ func main() {
 
 	// Storage API
 	api := handlers.NewAPI(db)
-	// storageApi := apiGroup.Group("/storage")
-	storageApi := e
+	storageApi := apiGroup.Group("/storage")
+	// storageApi := e
 
 	storageApi.GET("", api.ListBuckets)         // s3cmd compatibility
 	storageApi.GET("/:bucket", api.ListObjects) // s3cmd compatibility
