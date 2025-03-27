@@ -197,7 +197,11 @@ func GetChatsHandler(db *sql.DB) echo.HandlerFunc {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to query chats")
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing rows")
+			}
+		}()
 
 		chats := []Chat{}
 		for rows.Next() {
@@ -287,7 +291,11 @@ func GetChatMessagesHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to query chat messages")
 			return err
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing rows")
+			}
+		}()
 
 		messages := []ChatMessage{}
 		for rows.Next() {

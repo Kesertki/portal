@@ -48,7 +48,11 @@ func GetGeoLocation(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Storage connection failed"})
 	}
-	defer db.Close()
+	defer func() {
+		if cerr := db.Close(); cerr != nil {
+			log.Println("Error closing database connection:", cerr)
+		}
+	}()
 
 	cached, err := storage.GetFromCache(db, ip)
 	if err != nil {
@@ -64,7 +68,11 @@ func GetGeoLocation(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get geolocation"})
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Println("Error closing response body:", cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to get geolocation"})

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -26,7 +27,11 @@ func CreateFileHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to open file")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer src.Close()
+		defer func() {
+			if cerr := src.Close(); cerr != nil {
+				fmt.Printf("Error closing file: %v\n", cerr)
+			}
+		}()
 
 		userID := c.FormValue("user_id")
 		filePath := filepath.Join(c.FormValue("path"), file.Filename)
@@ -42,11 +47,7 @@ func CreateFileHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to start transaction")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer func() {
-			if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
-				log.Error().Err(rErr).Msg("Failed to rollback transaction")
-			}
-		}()
+		rollback(tx)
 
 		res, err := tx.Exec("INSERT INTO files (user_id, path, filename, size) VALUES (?, ?, ?, ?)", userID, filePath, file.Filename, fileSize)
 		if err != nil {
@@ -117,7 +118,11 @@ func ReadFileHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to get file content")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing rows")
+			}
+		}()
 
 		c.Response().Header().Set(echo.HeaderContentType, echo.MIMEOctetStream)
 		for rows.Next() {
@@ -158,7 +163,11 @@ func UpdateFileHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to open file")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer src.Close()
+		defer func() {
+			if cerr := src.Close(); cerr != nil {
+				fmt.Printf("Error closing file: %v\n", cerr)
+			}
+		}()
 
 		var fileID int64
 		err = db.QueryRow("SELECT id FROM files WHERE user_id = ? AND path = ?", userID, filePath).Scan(&fileID)
@@ -263,7 +272,11 @@ func ListDirectoryHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to list directory")
 			return c.String(http.StatusInternalServerError, "Internal Server Error")
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing rows")
+			}
+		}()
 
 		var files []string
 		for rows.Next() {

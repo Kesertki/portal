@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/rs/zerolog/log"
 )
 
 type API struct {
@@ -31,7 +32,11 @@ func (a *API) ListBuckets(c echo.Context) error {
 			Message: "Failed to retrieve buckets",
 		})
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Error().Err(err).Msg("Error closing rows")
+		}
+	}()
 
 	type Bucket struct {
 		Name         string `xml:"Name"`
@@ -113,14 +118,14 @@ func (a *API) DeleteBucket(c echo.Context) error {
 	// Delete all objects in the bucket
 	_, err = tx.Exec("DELETE FROM objects WHERE bucket_id = (SELECT id FROM buckets WHERE name = ?)", bucketName)
 	if err != nil {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete objects</Message></Error>`)
 	}
 
 	// Delete the bucket itself
 	_, err = tx.Exec("DELETE FROM buckets WHERE name = ?", bucketName)
 	if err != nil {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete bucket</Message></Error>`)
 	}
 
@@ -159,7 +164,11 @@ func (a *API) UploadObject(c echo.Context) error {
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to open file</Message></Error>`)
 	}
-	defer src.Close()
+	defer func() {
+		if cerr := src.Close(); cerr != nil {
+			fmt.Printf("Error closing file: %v\n", cerr)
+		}
+	}()
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, src)
@@ -281,7 +290,11 @@ func (a *API) ListObjects(c echo.Context) error {
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to retrieve objects</Message></Error>`)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Error().Err(err).Msg("Error closing rows")
+		}
+	}()
 
 	type Object struct {
 		Key          string `xml:"Key"`
@@ -502,7 +515,11 @@ func (a *API) CompleteMultipartUpload(c echo.Context) error {
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code></Error>`)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Error().Err(err).Msg("Error closing rows")
+		}
+	}()
 
 	var finalData bytes.Buffer
 	for rows.Next() {
@@ -561,26 +578,26 @@ func (a *API) AbortMultipartUpload(c echo.Context) error {
 	var exists bool
 	err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM multipart_uploads WHERE upload_id = ? AND bucket_id = (SELECT id FROM buckets WHERE name = ?) AND key = ?)", uploadID, bucket, key).Scan(&exists)
 	if err != nil {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to verify upload ID</Message></Error>`)
 	}
 
 	if !exists {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchUpload</Code><Message>The specified multipart upload does not exist</Message></Error>`)
 	}
 
 	// Delete all parts associated with the upload ID
 	_, err = tx.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
 	if err != nil {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete parts</Message></Error>`)
 	}
 
 	// Delete the multipart upload record
 	_, err = tx.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
 	if err != nil {
-		tx.Rollback()
+		rollback(tx)
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete upload record</Message></Error>`)
 	}
 

@@ -48,7 +48,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to open database")
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database")
+		}
+	}()
 
 	e := echo.New()
 

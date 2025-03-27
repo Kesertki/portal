@@ -61,7 +61,11 @@ func ListRemindersHandler(db *sql.DB) echo.HandlerFunc {
 			log.Error().Err(err).Msg("Failed to query reminders")
 			return err
 		}
-		defer rows.Close()
+		defer func() {
+			if err := rows.Close(); err != nil {
+				log.Error().Err(err).Msg("Error closing rows")
+			}
+		}()
 
 		reminders := []Reminder{}
 		for rows.Next() {
@@ -129,7 +133,11 @@ func notifyWebhook(reminder Reminder, webhookURL string) error {
 		log.Error().Err(err).Msg("Failed to send webhook")
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Error().Err(cerr).Msg("Error closing response body")
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to send webhook: %s", resp.Status)
@@ -144,7 +152,11 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 	if err != nil {
 		log.Fatal().Msg("Storage connection failed")
 	}
-	defer db.Close()
+	defer func() {
+		if cerr := db.Close(); cerr != nil {
+			log.Error().Err(cerr).Msg("Error closing database connection")
+		}
+	}()
 
 	ticker := time.NewTicker(1 * time.Minute)
 	for range ticker.C {
@@ -163,9 +175,7 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 			truncatedNow.Add(time.Minute).Format("2006-01-02 15:04:05"))
 		if err != nil {
 			log.Error().Err(err).Msg("Error querying reminders")
-			if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
-				log.Error().Err(rErr).Msg("Failed to rollback transaction")
-			}
+			rollback(tx)
 			continue
 		}
 
@@ -173,9 +183,7 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 			var r Reminder
 			if err := rows.Scan(&r.ID, &r.Message, &r.WebhookURL); err != nil {
 				log.Error().Err(err).Msg("Error scanning reminder")
-				if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
-					log.Error().Err(rErr).Msg("Failed to rollback transaction")
-				}
+				rollback(tx)
 				continue
 			}
 			log.Info().Msgf("Reminder %s: %s", r.ID, r.Message)
@@ -193,13 +201,14 @@ func StartRemindersAgent(wsHandler *WebSocketHandler) {
 
 			if _, err := tx.Exec("UPDATE reminders SET completed = TRUE WHERE id = ?", r.ID); err != nil {
 				log.Error().Err(err).Msg("Error marking reminder as completed")
-				if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
-					log.Error().Err(rErr).Msg("Failed to rollback transaction")
-				}
+				rollback(tx)
 				continue
 			}
 		}
-		rows.Close()
+
+		if err := rows.Close(); err != nil {
+			log.Error().Err(err).Msg("Error closing rows")
+		}
 
 		if err := tx.Commit(); err != nil {
 			log.Error().Err(err).Msg("Error committing transaction")
