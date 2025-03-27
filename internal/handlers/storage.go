@@ -334,17 +334,6 @@ func (a *API) DeleteObject(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete object"})
 	}
 
-	// // Create XML response
-	// type DeleteResult struct {
-	// 	XMLName xml.Name `xml:"DeleteResult"`
-	// }
-
-	// response := DeleteResult{}
-
-	// // Set the Content-Type header to application/xml
-	// c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
-
-	// return c.XML(http.StatusOK, response)
 	// Return a 204 No Content response to indicate successful deletion
 	return c.NoContent(http.StatusNoContent)
 }
