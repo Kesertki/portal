@@ -91,10 +91,9 @@ func main() {
 	storageApi := apiGroup.Group("/storage")
 	// storageApi := e
 
-	storageApi.GET("", api.ListBuckets)         // s3cmd compatibility
-	storageApi.GET("/:bucket", api.ListObjects) // s3cmd compatibility
 	storageApi.GET("/buckets", api.ListBuckets)
 	storageApi.POST("/buckets/:bucket", api.CreateBucket)
+	storageApi.DELETE("/buckets/:bucket", api.DeleteBucket)
 	storageApi.POST("/buckets/:bucket/objects/:key", api.UploadObject)
 	storageApi.PUT("/buckets/:bucket/objects/:key", api.UploadPart)
 	storageApi.GET("/buckets/:bucket/objects/:key", api.GetObject)
@@ -103,8 +102,12 @@ func main() {
 	storageApi.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
 	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
 
-	// Catch-all route for S3 compatibility
+	// s3cmd compatibility
+	storageApi.GET("", api.ListBuckets)
+	storageApi.GET("/:bucket", api.ListObjects)
+	// Catch-all route for S3 API
 	storageApi.Match([]string{http.MethodGet, http.MethodHead}, "/:bucket/:key", api.GetObject)
+	storageApi.DELETE("/:bucket", api.DeleteBucket)
 	storageApi.DELETE("/:bucket/:key", api.DeleteObject)
 
 	// Start WebSocket handler

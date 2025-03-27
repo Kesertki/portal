@@ -70,6 +70,38 @@ func (a *API) CreateBucket(c echo.Context) error {
 	return c.JSON(http.StatusCreated, echo.Map{"message": "Bucket created"})
 }
 
+func (a *API) DeleteBucket(c echo.Context) error {
+	bucketName := c.Param("bucket")
+
+	// Start a transaction to ensure atomicity
+	tx, err := a.db.Begin()
+	if err != nil {
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to start transaction</Message></Error>`)
+	}
+
+	// Delete all objects in the bucket
+	_, err = tx.Exec("DELETE FROM objects WHERE bucket_id = (SELECT id FROM buckets WHERE name = ?)", bucketName)
+	if err != nil {
+		tx.Rollback()
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete objects</Message></Error>`)
+	}
+
+	// Delete the bucket itself
+	_, err = tx.Exec("DELETE FROM buckets WHERE name = ?", bucketName)
+	if err != nil {
+		tx.Rollback()
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete bucket</Message></Error>`)
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to commit transaction</Message></Error>`)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (a *API) UploadObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")

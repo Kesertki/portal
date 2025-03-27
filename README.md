@@ -743,6 +743,21 @@ Provides a simple S3-compatible storage API for uploading and downloading files.
 - [HEAD /:bucket/:key](#head-apistoragebucketkey) - Get object metadata
 - [DELETE /:bucket/:key](#delete-apistoragebucketkey) - Delete an object
 
+#### Using with s3cmd
+
+Create a new S3 configuration file:
+
+```shell
+cat <<EOF > .s3cfg
+[default]
+access_key = your-access-key
+secret_key = your-secret-key
+host_base = localhost:1323/api/storage
+host_bucket = localhost:1323/api/storage/%(bucket)
+use_https = False
+EOF
+```
+
 ## WebSockets
 
 The server supports WebSockets for real-time communication with clients.
