@@ -59,15 +59,21 @@ func (a *API) ListBuckets(c echo.Context) error {
 	return c.XML(http.StatusOK, response)
 }
 
-// Create a new bucket
 func (a *API) CreateBucket(c echo.Context) error {
-	name := c.Param("bucket")
+	bucketName := c.Param("bucket")
 
-	_, err := a.db.Exec("INSERT INTO buckets (name) VALUES (?)", name)
+	// Insert the new bucket into the database
+	_, err := a.db.Exec("INSERT INTO buckets (name) VALUES (?)", bucketName)
 	if err != nil {
-		return c.JSON(http.StatusConflict, echo.Map{"error": "Bucket already exists"})
+		if strings.Contains(err.Error(), "Duplicate entry") {
+			return c.XML(http.StatusConflict, `<Error><Code>BucketAlreadyExists</Code><Message>The requested bucket name is not available</Message></Error>`)
+		}
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to create bucket</Message></Error>`)
 	}
-	return c.JSON(http.StatusCreated, echo.Map{"message": "Bucket created"})
+
+	response := `<CreateBucketResponse><Message>Bucket created successfully</Message></CreateBucketResponse>`
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+	return c.XML(http.StatusCreated, response)
 }
 
 func (a *API) DeleteBucket(c echo.Context) error {
@@ -203,17 +209,38 @@ func (a *API) GetObject(c echo.Context) error {
 func (a *API) ListObjects(c echo.Context) error {
 	bucketName := c.Param("bucket")
 	delimiter := c.QueryParam("delimiter")
+	location := c.QueryParam("location")
+
+	if location != "" {
+		// Return a default location for the bucket
+		response := struct {
+			XMLName xml.Name `xml:"LocationConstraint"`
+			Value   string   `xml:",chardata"`
+		}{
+			Value: "us-east-1", // Default region
+		}
+		c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+		return c.XML(http.StatusOK, response)
+	}
 
 	// Get bucket ID from name
 	var bucketID int
 	err := a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucketName).Scan(&bucketID)
 	if err != nil {
-		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message></Error>`)
+		if err == sql.ErrNoRows {
+			return c.XML(http.StatusNotFound, `<Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist</Message></Error>`)
+		}
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to retrieve bucket information</Message></Error>`)
 	}
 
 	// Query objects for the given bucket
 	query := "SELECT key, created_at, LENGTH(data) as size FROM objects WHERE bucket_id = ?"
 	args := []interface{}{bucketID}
+
+	if delimiter != "" {
+		query += " AND key LIKE ?"
+		args = append(args, "%"+delimiter+"%")
+	}
 
 	rows, err := a.db.Query(query, args...)
 	if err != nil {
@@ -242,7 +269,7 @@ func (a *API) ListObjects(c echo.Context) error {
 		if delimiter != "" {
 			// Check if the key contains the delimiter and add the prefix
 			if strings.Contains(key, delimiter) {
-				prefix := key[:strings.Index(key, delimiter)+len(delimiter)]
+				prefix := key[:strings.Index(key, delimiter)+1]
 				if !contains(commonPrefixes, prefix) {
 					commonPrefixes = append(commonPrefixes, prefix)
 				}
@@ -307,17 +334,19 @@ func (a *API) DeleteObject(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete object"})
 	}
 
-	// Create XML response
-	type DeleteResult struct {
-		XMLName xml.Name `xml:"DeleteResult"`
-	}
+	// // Create XML response
+	// type DeleteResult struct {
+	// 	XMLName xml.Name `xml:"DeleteResult"`
+	// }
 
-	response := DeleteResult{}
+	// response := DeleteResult{}
 
-	// Set the Content-Type header to application/xml
-	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+	// // Set the Content-Type header to application/xml
+	// c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
 
-	return c.XML(http.StatusOK, response)
+	// return c.XML(http.StatusOK, response)
+	// Return a 204 No Content response to indicate successful deletion
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (a *API) InitiateMultipartUpload(c echo.Context) error {

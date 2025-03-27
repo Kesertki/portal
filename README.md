@@ -728,20 +728,80 @@ Provides a simple S3-compatible storage API for uploading and downloading files.
 
 > All api endpoints are prefixed with `/api/storage`.
 
-- [GET /](#get-api-storage) - List all buckets
-- [GET /:bucket](#get-apistoragebucket) - List all objects in a bucket
-- [GET /buckets](#get-apistoragebuckets) - List all buckets
-- [POST /buckets/:bucket](#post-apistoragebucketsbucket) - Create a new bucket
-- [POST /buckets/:bucket/objects/:key](#post-apistoragebucketsbucketobjectskey) - Upload a new object
-- [PUT /buckets/:bucket/objects/:key](#put-apistoragebucketsbucketobjectskey) - Upload a part of the multipart object
-- [GET /buckets/:bucket/objects/:key](#get-apistoragebucketsbucketobjectskey) - Download an object
-- [HEAD /buckets/:bucket/objects/:key](#head-apistoragebucketsbucketobjectskey) - Get object metadata
-- [GET /buckets/:bucket/objects](#get-apistoragebucketsbucketobjects) - List all objects in a bucket
-- [DELETE /buckets/:bucket/objects/:key](#delete-apistoragebucketsbucketobjectskey) - Delete an object
-- [POST /buckets/:bucket/objects/:key/complete](#post-apistoragebucketsbucketobjectskeycomplete) - Complete the multipart upload
-- [GET /:bucket/:key](#get-apistoragebucketkey) - Download an object
-- [HEAD /:bucket/:key](#head-apistoragebucketkey) - Get object metadata
-- [DELETE /:bucket/:key](#delete-apistoragebucketkey) - Delete an object
+- `GET /` - List all buckets
+- `GET /:bucket` - List all objects in a bucket
+- `GET /buckets` - List all buckets
+- `POST /buckets/:bucket` - Create a new bucket
+- `POST /buckets/:bucket/objects/:key` - Upload a new object
+- `PUT /buckets/:bucket/objects/:key` - Upload a part of the multipart object
+- `GET /buckets/:bucket/objects/:key` - Download an object
+- `HEAD /buckets/:bucket/objects/:key` - Get object metadata
+- `GET /buckets/:bucket/objects` - List all objects in a bucket
+- `DELETE /buckets/:bucket/objects/:key` - Delete an object
+- `POST /buckets/:bucket/objects/:key/complete` - Complete the multipart upload
+- `GET /:bucket/:key` - Download an object
+- `HEAD /:bucket/:key` - Get object metadata
+- `DELETE /:bucket/:key` - Delete an object
+
+### Using with CURL
+
+Create a new bucket:
+
+```shell
+curl -X POST http://localhost:1323/api/storage/buckets/mybucket
+
+{"message":"Bucket created"}
+```
+
+Upload a new object:
+
+```shell
+curl -X POST \
+    -F "file=@README.md;type=text/markdown" \
+    http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+
+{"message":"File uploaded successfully"}
+```
+
+Download an object:
+
+```shell
+curl -X GET http://localhost:1323/api/storage/buckets/mybucket/objects/README.md \
+    --output downloaded.md
+```
+
+List all objects in a bucket:
+
+```shell
+curl -X GET http://localhost:1323/api/storage/buckets/mybucket/objects
+```
+
+Response example:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult>
+    <Name>mybucket</Name>
+    <Prefix></Prefix>
+    <Marker></Marker>
+    <MaxKeys>1000</MaxKeys>
+    <IsTruncated>false</IsTruncated>
+    <Contents>
+        <Key>README.md</Key>
+        <LastModified>2025-03-27T18:49:39Z</LastModified>
+        <ETag>dummy-etag</ETag>
+        <Size>18236</Size>
+        <StorageClass>STANDARD</StorageClass>
+    </Contents>
+    <CommonPrefixes></CommonPrefixes>
+</ListBucketResult>
+```
+
+Delete an object:
+
+```shell
+curl -X DELETE http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+```
 
 #### Using with s3cmd
 

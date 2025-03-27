@@ -105,6 +105,7 @@ func main() {
 	// s3cmd compatibility
 	storageApi.GET("", api.ListBuckets)
 	storageApi.GET("/:bucket", api.ListObjects)
+	storageApi.PUT("/:bucket", api.CreateBucket)
 	// Catch-all route for S3 API
 	storageApi.Match([]string{http.MethodGet, http.MethodHead}, "/:bucket/:key", api.GetObject)
 	storageApi.DELETE("/:bucket", api.DeleteBucket)
