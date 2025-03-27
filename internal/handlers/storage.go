@@ -128,11 +128,19 @@ func (a *API) ListObjects(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"objects": objects})
 }
 
-// Delete an object
 func (a *API) DeleteObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")
+	uploadID := c.QueryParam("uploadId")
 
+	if uploadID != "" {
+		// Abort multipart upload
+		_, _ = a.db.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
+		_, _ = a.db.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
+		return c.XML(http.StatusOK, `<AbortMultipartUploadResult/>`)
+	}
+
+	// Delete completed object
 	_, err := a.db.Exec(`
 		DELETE FROM objects
 		WHERE key = ? AND bucket_id = (SELECT id FROM buckets WHERE name = ?)`, key, bucket)
@@ -291,13 +299,4 @@ func (a *API) CompleteMultipartUpload(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXML)
 
 	return c.XML(http.StatusOK, xmlResponse)
-}
-
-func (a *API) AbortMultipartUpload(c echo.Context) error {
-	uploadID := c.QueryParam("uploadId")
-
-	_, _ = a.db.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
-	_, _ = a.db.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
-
-	return c.XML(http.StatusOK, `<AbortMultipartUploadResult/>`)
 }
