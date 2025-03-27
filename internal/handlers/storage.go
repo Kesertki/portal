@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -69,7 +70,6 @@ func (a *API) CreateBucket(c echo.Context) error {
 	return c.JSON(http.StatusCreated, echo.Map{"message": "Bucket created"})
 }
 
-// Upload an object
 func (a *API) UploadObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")
@@ -111,7 +111,13 @@ func (a *API) UploadObject(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
 	}
 
-	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data) VALUES (?, ?, ?)", bucketID, key, buf.Bytes())
+	// Get the Content-Type from the request header
+	contentType := c.Request().Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream" // Default content type if not provided
+	}
+
+	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data, content_type, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)", bucketID, key, buf.Bytes(), contentType)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to save file"})
 	}
@@ -119,25 +125,48 @@ func (a *API) UploadObject(c echo.Context) error {
 	return c.JSON(http.StatusOK, echo.Map{"message": "File uploaded successfully"})
 }
 
-// Get an object
 func (a *API) GetObject(c echo.Context) error {
 	bucket := c.Param("bucket")
 	key := c.Param("key")
 
 	var data []byte
-	var contentType string
+	var contentType sql.NullString
+	var lastModified time.Time
 
 	err := a.db.QueryRow(`
-		SELECT o.data, o.content_type
+		SELECT o.data, o.content_type, o.created_at
 		FROM objects o
 		JOIN buckets b ON o.bucket_id = b.id
-		WHERE b.name = ? AND o.key = ?`, bucket, key).Scan(&data, &contentType)
+		WHERE b.name = ? AND o.key = ?`, bucket, key).Scan(&data, &contentType, &lastModified)
 
 	if err != nil {
+		fmt.Println("Error retrieving object:", err)
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "Object not found"})
 	}
 
-	return c.Blob(http.StatusOK, contentType, data)
+	finalContentType := "application/octet-stream"
+	if contentType.Valid {
+		finalContentType = contentType.String
+	}
+
+	fmt.Println("Retrieved object data:", string(data))
+	fmt.Println("Content-Type:", finalContentType)
+
+	// Calculate ETag
+	etag := fmt.Sprintf("%x", md5.Sum(data))
+
+	// Set the Content-Length, ETag, and Last-Modified headers
+	contentLength := len(data)
+	c.Response().Header().Set(echo.HeaderContentLength, fmt.Sprintf("%d", contentLength))
+	c.Response().Header().Set("ETag", etag)
+	c.Response().Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))
+
+	if c.Request().Method == http.MethodHead {
+		// For HEAD requests, return headers without the body
+		return c.NoContent(http.StatusOK)
+	}
+
+	return c.Blob(http.StatusOK, finalContentType, data)
 }
 
 func (a *API) ListObjects(c echo.Context) error {
