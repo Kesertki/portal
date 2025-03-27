@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS objects (
     data BLOB NOT NULL,
     content_type TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    etag TEXT NOT NULL,
     FOREIGN KEY (bucket_id) REFERENCES buckets(id),
     UNIQUE(bucket_id, key)
 );
@@ -29,6 +30,7 @@ CREATE TABLE IF NOT EXISTS multipart_parts (
     upload_id TEXT NOT NULL,
     part_number INTEGER NOT NULL,
     data BLOB NOT NULL,
+    etag TEXT NOT NULL,
     FOREIGN KEY (upload_id) REFERENCES multipart_uploads(upload_id),
     UNIQUE(upload_id, part_number)
 );

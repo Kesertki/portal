@@ -747,7 +747,7 @@ Provides a simple S3-compatible storage API for uploading and downloading files.
 - `DELETE /:bucket` - Delete a bucket
 - `DELETE /:bucket/:key` - Delete an object
 
-### Using with CURL
+#### Using with CURL
 
 Create a new bucket:
 
@@ -806,9 +806,9 @@ Response example:
     <IsTruncated>false</IsTruncated>
     <Contents>
         <Key>README.md</Key>
-        <LastModified>2025-03-27T18:49:39Z</LastModified>
-        <ETag>dummy-etag</ETag>
-        <Size>18236</Size>
+        <LastModified>2025-03-27T22:05:28Z</LastModified>
+        <ETag>312a0794bb855b7cf9cda79422871489</ETag>
+        <Size>20007</Size>
         <StorageClass>STANDARD</StorageClass>
     </Contents>
     <CommonPrefixes></CommonPrefixes>
@@ -820,6 +820,68 @@ Delete an object:
 ```shell
 curl -X DELETE http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
 ```
+
+#### Multi-part Upload
+
+**Step 1: Initiate Multipart Upload**:
+
+Initiate a multipart upload by sending a POST request to your server. This will return an uploadId that you will use in subsequent requests.
+
+```shell
+curl -X POST http://localhost:1323/api/storage/buckets/mybucket/objects/myobject
+```
+
+**Step 2: Upload Parts**:
+
+Upload individual parts of the object using the uploadId obtained from the previous step. You need to specify the partNumber and uploadId as query parameters.
+
+```shell
+curl -X PUT "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?partNumber=1&uploadId=your-upload-id" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @part1.txt
+
+curl -X PUT "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?partNumber=2&uploadId=your-upload-id" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @part2.txt
+```
+
+**Step 3: Complete Multipart Upload**:
+
+Complete the multipart upload by sending a POST request with the uploadId. You need to provide a list of parts in the request body.
+
+```shell
+curl -X POST "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/complete?uploadId=your-upload-id" \
+     -H "Content-Type: application/xml" \
+     --data-binary @complete.xml
+```
+
+The **complete.xml** file should contain the list of parts, like this:
+
+```xml
+<CompleteMultipartUpload>
+    <Part>
+        <PartNumber>1</PartNumber>
+        <ETag>etag-for-part-1</ETag>
+    </Part>
+    <Part>
+        <PartNumber>2</PartNumber>
+        <ETag>etag-for-part-2</ETag>
+    </Part>
+</CompleteMultipartUpload>
+```
+
+**Step 4: Abort Multipart Upload (if needed)**:
+
+If you need to abort the upload, you can send a DELETE request with the uploadId.
+
+```shell
+curl -X DELETE "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?uploadId=your-upload-id"
+```
+
+**Notes**:
+
+- Replace mybucket, myobject, your-upload-id, part1.txt, and part2.txt with your actual bucket name, object key, upload ID, and part files.
+- The ETag values in the complete.xml file should match the ETags returned by the server when you uploaded each part.
 
 #### Using with s3cmd
 
@@ -840,8 +902,12 @@ Create a new bucket:
 
 ```shell
 s3cmd -c .s3cfg mb s3://mybucket
+```
 
-# Bucket 's3://mybucket/' created
+Response:
+
+```text
+Bucket 's3://mybucket/' created
 ```
 
 List all buckets:
@@ -850,7 +916,7 @@ List all buckets:
 s3cmd -c .s3cfg ls      
 ```
 
-Example output:
+Example response:
 
 ```text
 2025-03-27 19:06  s3://mybucket
@@ -865,8 +931,12 @@ Delete the bucket:
 
 ```shell
 s3cmd -c .s3cfg rb s3://mybucket5
+```
 
-## Bucket 's3://mybucket5/' removed
+Response:
+
+```text
+Bucket 's3://mybucket5/' removed
 ```
 
 ## WebSockets

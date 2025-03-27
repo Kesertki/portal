@@ -173,13 +173,13 @@ func (a *API) UploadObject(c echo.Context) error {
 		contentType = "application/octet-stream" // Default content type if not provided
 	}
 
-	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data, content_type, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)", bucketID, key, buf.Bytes(), contentType)
+	// Calculate ETag
+	etag := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
+
+	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data, content_type, created_at, etag) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?)", bucketID, key, buf.Bytes(), contentType, etag)
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to save file</Message></Error>`)
 	}
-
-	// Calculate ETag
-	etag := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
 
 	// Return XML response for successful upload
 	response := struct {
@@ -200,12 +200,13 @@ func (a *API) GetObject(c echo.Context) error {
 	var data []byte
 	var contentType sql.NullString
 	var lastModified time.Time
+	var etag string
 
 	err := a.db.QueryRow(`
-		SELECT o.data, o.content_type, o.created_at
+		SELECT o.data, o.content_type, o.created_at, o.etag
 		FROM objects o
 		JOIN buckets b ON o.bucket_id = b.id
-		WHERE b.name = ? AND o.key = ?`, bucket, key).Scan(&data, &contentType, &lastModified)
+		WHERE b.name = ? AND o.key = ?`, bucket, key).Scan(&data, &contentType, &lastModified, &etag)
 
 	if err != nil {
 		fmt.Println("Error retrieving object:", err)
@@ -219,9 +220,6 @@ func (a *API) GetObject(c echo.Context) error {
 
 	fmt.Println("Retrieved object data:", string(data))
 	fmt.Println("Content-Type:", finalContentType)
-
-	// Calculate ETag
-	etag := fmt.Sprintf("%x", md5.Sum(data))
 
 	// Set the Content-Length, ETag, and Last-Modified headers
 	contentLength := len(data)
@@ -265,7 +263,7 @@ func (a *API) ListObjects(c echo.Context) error {
 	}
 
 	// Query objects for the given bucket
-	query := "SELECT key, created_at, LENGTH(data) as size FROM objects WHERE bucket_id = ?"
+	query := "SELECT key, created_at, LENGTH(data) as size, etag FROM objects WHERE bucket_id = ?"
 	args := []interface{}{bucketID}
 
 	if delimiter != "" {
@@ -293,7 +291,8 @@ func (a *API) ListObjects(c echo.Context) error {
 		var key string
 		var createdAt string
 		var size int64
-		if err := rows.Scan(&key, &createdAt, &size); err != nil {
+		var etag string
+		if err := rows.Scan(&key, &createdAt, &size, &etag); err != nil {
 			return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to scan object data</Message></Error>`)
 		}
 
@@ -309,8 +308,6 @@ func (a *API) ListObjects(c echo.Context) error {
 			}
 		}
 
-		// For simplicity, using a dummy ETag and StorageClass
-		etag := "dummy-etag" // Replace with actual ETag calculation if available
 		storageClass := "STANDARD"
 		objects = append(objects, Object{Key: key, LastModified: createdAt, ETag: etag, Size: size, StorageClass: storageClass})
 	}
@@ -437,8 +434,8 @@ func (a *API) UploadPart(c echo.Context) error {
 	fmt.Println("Calculated ETag:", etag)
 
 	// Store the part data
-	_, err = a.db.Exec("INSERT INTO multipart_parts (upload_id, part_number, data) VALUES (?, ?, ?)",
-		uploadID, partNumber, buf.Bytes())
+	_, err = a.db.Exec("INSERT INTO multipart_parts (upload_id, part_number, data, etag) VALUES (?, ?, ?, ?)",
+		uploadID, partNumber, buf.Bytes(), etag)
 	if err != nil {
 		return c.XML(http.StatusConflict, `<Error><Code>PartAlreadyExists</Code></Error>`)
 	}
@@ -486,8 +483,11 @@ func (a *API) CompleteMultipartUpload(c echo.Context) error {
 		finalData.Write(partData)
 	}
 
+	// Calculate ETag for the final object
+	etag := fmt.Sprintf("%x", md5.Sum(finalData.Bytes()))
+
 	// Store the final object
-	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data) VALUES (?, ?, ?)", bucketID, key, finalData.Bytes())
+	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data, etag) VALUES (?, ?, ?, ?)", bucketID, key, finalData.Bytes(), etag)
 	if err != nil {
 		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code></Error>`)
 	}
@@ -495,8 +495,6 @@ func (a *API) CompleteMultipartUpload(c echo.Context) error {
 	// Cleanup
 	_, _ = a.db.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
 	_, _ = a.db.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
-
-	etag := fmt.Sprintf("%x", md5.Sum(finalData.Bytes()))
 
 	// Construct the XML response
 	xmlResponse := struct {
