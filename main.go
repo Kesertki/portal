@@ -92,9 +92,11 @@ func main() {
 
 	e.POST("/buckets/:bucket", api.CreateBucket)
 	e.POST("/buckets/:bucket/objects/:key", api.UploadObject)
+	e.PUT("/buckets/:bucket/objects/:key", api.UploadPart)
 	e.GET("/buckets/:bucket/objects/:key", api.GetObject)
 	e.GET("/buckets/:bucket/objects", api.ListObjects)
 	e.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
+	e.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")
