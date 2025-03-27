@@ -124,7 +124,7 @@ func (a *API) UploadObject(c echo.Context) error {
 	file, err := c.FormFile("file")
 	if err != nil {
 		fmt.Println("Error: Invalid file upload")
-		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Invalid file"})
+		return c.XML(http.StatusBadRequest, `<Error><Code>InvalidRequest</Code><Message>Invalid file</Message></Error>`)
 	}
 
 	fmt.Println("Uploading file:", file.Filename)
@@ -132,20 +132,20 @@ func (a *API) UploadObject(c echo.Context) error {
 	// Save the file to the database
 	src, err := file.Open()
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to open file"})
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to open file</Message></Error>`)
 	}
 	defer src.Close()
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, src)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to read file"})
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to read file</Message></Error>`)
 	}
 
 	var bucketID int
 	err = a.db.QueryRow("SELECT id FROM buckets WHERE name = ?", bucket).Scan(&bucketID)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, echo.Map{"error": "Bucket not found"})
+		return c.XML(http.StatusNotFound, `<Error><Code>NoSuchBucket</Code><Message>Bucket not found</Message></Error>`)
 	}
 
 	// Get the Content-Type from the multipart form data
@@ -156,10 +156,22 @@ func (a *API) UploadObject(c echo.Context) error {
 
 	_, err = a.db.Exec("INSERT INTO objects (bucket_id, key, data, content_type, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)", bucketID, key, buf.Bytes(), contentType)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to save file"})
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to save file</Message></Error>`)
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"message": "File uploaded successfully"})
+	// Calculate ETag
+	etag := fmt.Sprintf("%x", md5.Sum(buf.Bytes()))
+
+	// Return XML response for successful upload
+	response := struct {
+		XMLName xml.Name `xml:"PutObjectResult"`
+		ETag    string   `xml:"ETag"`
+	}{
+		ETag: etag,
+	}
+
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXMLCharsetUTF8)
+	return c.XML(http.StatusOK, response)
 }
 
 func (a *API) GetObject(c echo.Context) error {
@@ -485,4 +497,39 @@ func (a *API) CompleteMultipartUpload(c echo.Context) error {
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationXML)
 
 	return c.XML(http.StatusOK, xmlResponse)
+}
+
+func (a *API) AbortMultipartUpload(c echo.Context) error {
+	bucket := c.Param("bucket")
+	key := c.Param("key")
+	uploadID := c.QueryParam("uploadId")
+
+	// Start a transaction to ensure atomicity
+	tx, err := a.db.Begin()
+	if err != nil {
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to start transaction</Message></Error>`)
+	}
+
+	// Delete all parts associated with the upload ID
+	_, err = tx.Exec("DELETE FROM multipart_parts WHERE upload_id = ?", uploadID)
+	if err != nil {
+		tx.Rollback()
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete parts</Message></Error>`)
+	}
+
+	// Delete the multipart upload record
+	_, err = tx.Exec("DELETE FROM multipart_uploads WHERE upload_id = ?", uploadID)
+	if err != nil {
+		tx.Rollback()
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to delete upload record</Message></Error>`)
+	}
+
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		return c.XML(http.StatusInternalServerError, `<Error><Code>InternalError</Code><Message>Failed to commit transaction</Message></Error>`)
+	}
+
+	// Return a successful response
+	return c.NoContent(http.StatusNoContent)
 }

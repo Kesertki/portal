@@ -94,13 +94,15 @@ func main() {
 	storageApi.GET("/buckets", api.ListBuckets)
 	storageApi.POST("/buckets/:bucket", api.CreateBucket)
 	storageApi.DELETE("/buckets/:bucket", api.DeleteBucket)
-	storageApi.POST("/buckets/:bucket/objects/:key", api.UploadObject)
-	storageApi.PUT("/buckets/:bucket/objects/:key", api.UploadPart)
+	storageApi.PUT("/buckets/:bucket/objects/:key", api.UploadObject)
+	storageApi.POST("/buckets/:bucket/objects/:key", api.InitiateMultipartUpload)
+	storageApi.PUT("/buckets/:bucket/objects/:key/uploads", api.UploadPart)
+	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
+	storageApi.DELETE("/buckets/:bucket/objects/:key/uploads", api.AbortMultipartUpload)
 	storageApi.GET("/buckets/:bucket/objects/:key", api.GetObject)
 	storageApi.HEAD("/buckets/:bucket/objects/:key", api.GetObject)
 	storageApi.GET("/buckets/:bucket/objects", api.ListObjects)
 	storageApi.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
-	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
 
 	// s3cmd compatibility
 	storageApi.GET("", api.ListBuckets)
