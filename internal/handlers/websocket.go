@@ -39,7 +39,11 @@ func (h *WebSocketHandler) HandleWebSocket(c echo.Context) error {
 		log.Println("WebSocket upgrade failed:", err)
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			log.Println("Error closing WebSocket connection:", cerr)
+		}
+	}()
 
 	h.mutex.Lock()
 	h.clients[conn] = true

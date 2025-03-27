@@ -20,6 +20,7 @@ Tiny API and Agent server enabling AI models to access various local services in
 - [x] [Reminders API](#reminders-api)
 - [x] [Chats API](#chats-api)
 - [x] [Files API](#files-api)
+- [x] [Storage API (S3 compatible)](#storage-api-s3-compatible)
 - [ ] Notes API
 - [ ] Web Search API
 - [ ] Weather API
@@ -719,6 +720,223 @@ curl -X GET "http://localhost:1323/api/fs/list/user/files?user_id=123e4567-e89b-
 [
   "README.md"
 ]
+```
+
+### Storage API (S3 compatible)
+
+Provides a simple S3-compatible storage API for uploading and downloading files. Basic compatibility with `s3cmd` and other S3 clients.
+
+> All api endpoints are prefixed with `/api/storage`.
+
+- `GET /` - List all buckets
+- `POST /buckets/:bucket` - Create a new bucket
+- `DELETE /buckets/:bucket` - Delete a bucket
+- `PUT /buckets/:bucket/objects/:key` - Upload object
+- `POST /buckets/:bucket/objects/:key` - Initiate a multipart upload
+- `PUT /buckets/:bucket/objects/:key/uploads` - Upload a part of the multipart object
+- `POST /buckets/:bucket/objects/:key/complete` - Complete the multipart upload
+- `DELETE /buckets/:bucket/objects/:key/uploads` - Abort the multipart upload
+- `GET /buckets/:bucket/objects/:key` - Download an object
+- `HEAD /buckets/:bucket/objects/:key` - Get object metadata
+- `GET /buckets/:bucket/objects` - List all objects in a bucket
+- `DELETE /buckets/:bucket/objects/:key` - Delete an object
+- `GET /:bucket` - List all objects in a bucket
+- `PUT /:bucket` - Create a new bucket
+- `GET /:bucket/:key` - Download an object
+- `HEAD /:bucket/:key` - Get object metadata
+- `DELETE /:bucket` - Delete a bucket
+- `DELETE /:bucket/:key` - Delete an object
+
+#### Using with CURL
+
+Create a new bucket:
+
+```shell
+curl -X POST http://localhost:1323/api/storage/buckets/mybucket
+```
+
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CreateBucketResponse>
+	<Message>Bucket created successfully</Message>
+</CreateBucketResponse>
+```
+
+Upload a new object:
+
+```shell
+curl -X PUT \
+     -F "file=@README.md;type=text/markdown" \
+     http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+```
+
+Response:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<PutObjectResult>
+	<ETag>5520927df1b08a8f5778c03b21c75d64</ETag>
+</PutObjectResult>
+```
+
+Download an object:
+
+```shell
+curl -X GET http://localhost:1323/api/storage/buckets/mybucket/objects/README.md \
+    --output downloaded.md
+```
+
+List all objects in a bucket:
+
+```shell
+curl -X GET http://localhost:1323/api/storage/buckets/mybucket/objects
+```
+
+Response example:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult>
+    <Name>mybucket</Name>
+    <Prefix></Prefix>
+    <Marker></Marker>
+    <MaxKeys>1000</MaxKeys>
+    <IsTruncated>false</IsTruncated>
+    <Contents>
+        <Key>README.md</Key>
+        <LastModified>2025-03-27T22:05:28Z</LastModified>
+        <ETag>312a0794bb855b7cf9cda79422871489</ETag>
+        <Size>20007</Size>
+        <StorageClass>STANDARD</StorageClass>
+    </Contents>
+    <CommonPrefixes></CommonPrefixes>
+</ListBucketResult>
+```
+
+Delete an object:
+
+```shell
+curl -X DELETE http://localhost:1323/api/storage/buckets/mybucket/objects/README.md
+```
+
+#### Multi-part Upload
+
+**Step 1: Initiate Multipart Upload**:
+
+Initiate a multipart upload by sending a POST request to your server. This will return an uploadId that you will use in subsequent requests.
+
+```shell
+curl -X POST http://localhost:1323/api/storage/buckets/mybucket/objects/myobject
+```
+
+**Step 2: Upload Parts**:
+
+Upload individual parts of the object using the uploadId obtained from the previous step. You need to specify the partNumber and uploadId as query parameters.
+
+```shell
+curl -X PUT "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?partNumber=1&uploadId=your-upload-id" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @part1.txt
+
+curl -X PUT "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?partNumber=2&uploadId=your-upload-id" \
+     -H "Content-Type: application/octet-stream" \
+     --data-binary @part2.txt
+```
+
+**Step 3: Complete Multipart Upload**:
+
+Complete the multipart upload by sending a POST request with the uploadId. You need to provide a list of parts in the request body.
+
+```shell
+curl -X POST "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/complete?uploadId=your-upload-id" \
+     -H "Content-Type: application/xml" \
+     --data-binary @complete.xml
+```
+
+The **complete.xml** file should contain the list of parts, like this:
+
+```xml
+<CompleteMultipartUpload>
+    <Part>
+        <PartNumber>1</PartNumber>
+        <ETag>etag-for-part-1</ETag>
+    </Part>
+    <Part>
+        <PartNumber>2</PartNumber>
+        <ETag>etag-for-part-2</ETag>
+    </Part>
+</CompleteMultipartUpload>
+```
+
+**Step 4: Abort Multipart Upload (if needed)**:
+
+If you need to abort the upload, you can send a DELETE request with the uploadId.
+
+```shell
+curl -X DELETE "http://localhost:1323/api/storage/buckets/mybucket/objects/myobject/uploads?uploadId=your-upload-id"
+```
+
+**Notes**:
+
+- Replace mybucket, myobject, your-upload-id, part1.txt, and part2.txt with your actual bucket name, object key, upload ID, and part files.
+- The ETag values in the complete.xml file should match the ETags returned by the server when you uploaded each part.
+
+#### Using with s3cmd
+
+Create a new S3 configuration file:
+
+```shell
+cat <<EOF > .s3cfg
+[default]
+access_key = your-access-key
+secret_key = your-secret-key
+host_base = localhost:1323/api/storage
+host_bucket = localhost:1323/api/storage/%(bucket)
+use_https = False
+EOF
+```
+
+Create a new bucket:
+
+```shell
+s3cmd -c .s3cfg mb s3://mybucket
+```
+
+Response:
+
+```text
+Bucket 's3://mybucket/' created
+```
+
+List all buckets:
+
+```shell
+s3cmd -c .s3cfg ls      
+```
+
+Example response:
+
+```text
+2025-03-27 19:06  s3://mybucket
+2025-03-27 19:12  s3://mybucket1
+2025-03-27 19:18  s3://mybucket2
+2025-03-27 19:19  s3://mybucket3
+2025-03-27 19:26  s3://mybucket4
+2025-03-27 19:26  s3://mybucket5
+```
+
+Delete the bucket:
+
+```shell
+s3cmd -c .s3cfg rb s3://mybucket5
+```
+
+Response:
+
+```text
+Bucket 's3://mybucket5/' removed
 ```
 
 ## WebSockets

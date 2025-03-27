@@ -48,7 +48,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to open database")
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Error().Err(err).Msg("Failed to close database")
+		}
+	}()
 
 	e := echo.New()
 
@@ -60,8 +64,7 @@ func main() {
 	}))
 
 	// Middleware
-	// e.Use(middleware.Logger())
-	// Custom logger middleware for Common Log Format (CLF)
+	e.Pre(middleware.RemoveTrailingSlash())
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "${remote_ip} - - [${time_rfc3339}] \"${method} ${uri} ${protocol}\" ${status} ${bytes_out}\n",
 		Output: os.Stderr,
@@ -86,6 +89,33 @@ func main() {
 	handlers.SetupReminderApiHandlers(apiGroup, db)
 	handlers.SetupChatApiHandlers(apiGroup, db)
 	handlers.SetupFileSystemApiHandlers(apiGroup, db)
+
+	// Storage API
+	api := handlers.NewAPI(db)
+	storageApi := apiGroup.Group("/storage")
+	// storageApi := e
+
+	storageApi.GET("/buckets", api.ListBuckets)
+	storageApi.POST("/buckets/:bucket", api.CreateBucket)
+	storageApi.DELETE("/buckets/:bucket", api.DeleteBucket)
+	storageApi.PUT("/buckets/:bucket/objects/:key", api.UploadObject)
+	storageApi.POST("/buckets/:bucket/objects/:key", api.InitiateMultipartUpload)
+	storageApi.PUT("/buckets/:bucket/objects/:key/uploads", api.UploadPart)
+	storageApi.POST("/buckets/:bucket/objects/:key/complete", api.CompleteMultipartUpload)
+	storageApi.DELETE("/buckets/:bucket/objects/:key/uploads", api.AbortMultipartUpload)
+	storageApi.GET("/buckets/:bucket/objects/:key", api.GetObject)
+	storageApi.HEAD("/buckets/:bucket/objects/:key", api.GetObject)
+	storageApi.GET("/buckets/:bucket/objects", api.ListObjects)
+	storageApi.DELETE("/buckets/:bucket/objects/:key", api.DeleteObject)
+
+	// s3cmd compatibility
+	storageApi.GET("", api.ListBuckets)
+	storageApi.GET("/:bucket", api.ListObjects)
+	storageApi.PUT("/:bucket", api.CreateBucket)
+	// Catch-all route for S3 API
+	storageApi.Match([]string{http.MethodGet, http.MethodHead}, "/:bucket/:key", api.GetObject)
+	storageApi.DELETE("/:bucket", api.DeleteBucket)
+	storageApi.DELETE("/:bucket/:key", api.DeleteObject)
 
 	// Start WebSocket handler
 	log.Info().Msg("Starting WebSocket handler")

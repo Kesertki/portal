@@ -75,7 +75,11 @@ func InstantAnswer(c echo.Context) error {
 		log.Println("Error:", err)
 		return c.String(500, "Failed to search")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Println("Error closing response body:", cerr)
+		}
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
