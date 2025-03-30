@@ -226,8 +226,12 @@ func CreateChatMessageHandler(db *sql.DB) echo.HandlerFunc {
 			return err
 		}
 
-		chatMessage.ID = uuid.New().String()
-		chatMessage.Timestamp = time.Now().Unix()
+		if chatMessage.ID == "" {
+			chatMessage.ID = uuid.New().String()
+		}
+		if chatMessage.Timestamp == 0 {
+			chatMessage.Timestamp = time.Now().Unix()
+		}
 
 		_, err := db.Exec("INSERT INTO messages(id, chat_id, sender, sender_role, content, timestamp, tools) VALUES(?, ?, ?, ?, ?, ?, ?)",
 			chatMessage.ID, chatMessage.ChatID, chatMessage.Sender, chatMessage.SenderRole, chatMessage.Content, chatMessage.Timestamp, chatMessage.Tools)
