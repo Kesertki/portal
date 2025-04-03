@@ -377,6 +377,7 @@ curl -X POST http://localhost:1323/api/reminders.add \
 - [POST /chats.rename](#post-chatsrename)
 - [POST /chats.pin](#post-chatspin)
 - [POST /chats.unpin](#post-chatsunpin)
+- [POST /chats.reset](#post-chatsreset)
 - [POST /messages.add](#post-messagesadd)
 - [GET /messages.list](#get-messageslist)
 
@@ -544,6 +545,29 @@ curl -X POST "http://localhost:1323/api/chats.unpin" \
   -d '{
     "chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
     "user_id": "some-user-id"
+  }'
+```
+
+#### POST /chats.reset
+
+Resets a chat starting from a specific message.
+This is useful for resuming a chat from a specific point, or regenerating the response.
+
+Request body:
+
+- `chat_id`: The chat ID
+- `user_id`: The user ID
+- `message_id`: The message ID to reset to
+
+Example:
+
+```shell
+curl -X POST "http://localhost:1323/api/chats.reset" \
+  -H "Content-Type: application/json" \
+  -d '{
+	"chat_id": "d6924d7f-e53d-452e-83a0-0f0893de68b5",
+	"user_id": "some-user-id",
+	"message_id": "c4de2af4-ea23-45a1-b039-cadace10491f"
   }'
 ```
 

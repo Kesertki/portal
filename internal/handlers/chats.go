@@ -45,6 +45,12 @@ type RenameChatRequest struct {
 	Title  string `json:"title"`
 }
 
+type ResetChatRequest struct {
+	ChatID    string `json:"chat_id"`
+	UserID    string `json:"user_id"`
+	MessageID string `json:"message_id"`
+}
+
 func SetupChatApiHandlers(apiGroup *echo.Group, db *sql.DB) {
 	log.Info().Msg("Initializing Chat API")
 
@@ -55,6 +61,7 @@ func SetupChatApiHandlers(apiGroup *echo.Group, db *sql.DB) {
 	apiGroup.POST("/chats.pin", PinChatHandler(db))
 	apiGroup.POST("/chats.unpin", UnpinChatHandler(db))
 	apiGroup.GET("/chats.info", GetChatInfoHandler(db))
+	apiGroup.POST("/chats.reset", ResetChatHandler(db))
 	apiGroup.POST("/messages.add", CreateChatMessageHandler(db))
 	apiGroup.GET("/messages.list", GetChatMessagesHandler(db))
 }
@@ -316,5 +323,35 @@ func GetChatMessagesHandler(db *sql.DB) echo.HandlerFunc {
 		}
 
 		return c.JSON(http.StatusOK, messages)
+	}
+}
+
+func ResetChatHandler(db *sql.DB) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		resetChatRequest := new(ResetChatRequest)
+		if err := c.Bind(resetChatRequest); err != nil {
+			log.Error().Err(err).Msg("Invalid request")
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		}
+
+		// Delete messages newer than request.MessageID, using timestamp
+		result, err := db.Exec("DELETE FROM messages WHERE chat_id = ? AND timestamp > (SELECT timestamp FROM messages WHERE id = ?)", resetChatRequest.ChatID, resetChatRequest.MessageID)
+
+		if err != nil {
+			log.Error().Err(err).Msg("Internal server error")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Error().Err(err).Msg("Internal server error")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Internal server error"})
+		}
+
+		if rowsAffected == 0 {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "Message not found"})
+		}
+
+		return c.NoContent(http.StatusOK)
 	}
 }
